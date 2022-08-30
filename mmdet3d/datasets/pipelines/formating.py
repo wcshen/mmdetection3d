@@ -288,10 +288,21 @@ class DefaultFormatBundleMultiCam3D(object):
         self.with_label = with_label
 
     def _format_multi_cam_imgs(self, results):
+        # imgs = [img.transpose(2, 0, 1) for img in results['img']]
+        #         imgs = np.ascontiguousarray(np.stack(imgs, axis=0))
+        #         results['img'] = DC(to_tensor(imgs), stack=True)
+        imgs_front = []
         for idx, np_img in enumerate(results['img']):
-            img = np.ascontiguousarray(np_img.transpose(2, 0, 1))
-            img = DC(to_tensor(img), stack=True)
-            results['img'][idx] = img
+            if idx > 1:  # FIXME(swc): only front_camera now
+                break
+            img_front = np_img.transpose(2,0,1)
+            imgs_front.append(img_front)
+        
+        imgs = np.ascontiguousarray(np.stack(imgs_front, axis=0))
+        results['img'] = DC(to_tensor(imgs), stack=True)
+        
+        # img = DC(to_tensor(img), stack=True)
+        # results['img'][idx] = img
 
         for key in [
             'proposals', 'gt_bboxes', 'gt_bboxes_ignore', 'gt_labels',

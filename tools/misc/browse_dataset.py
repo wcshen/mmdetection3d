@@ -11,7 +11,7 @@ from mmcv import Config, DictAction, mkdir_or_exist
 from mmdet3d.core.bbox import (Box3DMode, CameraInstance3DBoxes, Coord3DMode,
                                DepthInstance3DBoxes, LiDARInstance3DBoxes)
 from mmdet3d.core.visualizer import (show_multi_modality_result, show_result,
-                                     show_seg_result)
+                                     show_seg_result, show_multi_cams_modality_result)
 from mmdet3d.datasets import build_dataset
 
 
@@ -191,6 +191,32 @@ def show_proj_bbox_img(input, out_dir, show=False, is_nus_mono=False):
         show_multi_modality_result(
             img, None, None, None, out_dir, filename, show=show)
 
+
+def show_proj_bbox_mutlicam(input, out_dir, show=False):
+    """Visualize 3D bboxes on 2D image by projection."""
+    gt_bboxes = input['gt_bboxes_3d'].data
+    img_metas = input['img_metas'].data
+
+    img_list = []
+    Tr_list = []
+    filename_list = []
+    for img, tr, filename in zip(input['img'], img_metas['lidar2img'], img_metas['filename']):
+        this_img = img.data.numpy()
+        this_img = this_img.transpose(1, 2, 0)
+        this_filename = Path(filename).name
+
+        img_list.append(this_img)
+        Tr_list.append(tr)
+        filename_list.append(this_filename)
+
+    show_multi_cams_modality_result(img_list,
+                                    gt_bboxes,
+                                    None,
+                                    Tr_list,
+                                    out_dir,
+                                    filename_list,
+                                    img_metas=img_metas,
+                                    show=show)
 
 def main():
     args = parse_args()

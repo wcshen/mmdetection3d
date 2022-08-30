@@ -63,7 +63,7 @@ train_pipeline = [
     dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='PointShuffle'),
-    dict(type='DefaultFormatBundle3D', class_names=class_names),
+    dict(type='DefaultFormatBundleMultiCam3D', class_names=class_names),
     dict(type='Collect3D', keys=['points', 'gt_bboxes_3d', 'gt_labels_3d'])
 ]
 test_pipeline = [

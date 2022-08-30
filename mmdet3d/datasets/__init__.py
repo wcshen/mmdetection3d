@@ -6,7 +6,7 @@ from .custom_3d_seg import Custom3DSegDataset
 from .kitti_dataset import KittiDataset
 from .kitti_mono_dataset import KittiMonoDataset
 from .lyft_dataset import LyftDataset
-from .nuscenes_dataset import NuScenesDataset
+from .nuscenes_dataset import NuScenesDataset, CustomNuScenesDataset
 from .nuscenes_mono_dataset import NuScenesMonoDataset
 
 from .plus_kitti_datasets import PlusKittiDataset
@@ -35,6 +35,7 @@ from .waymo_dataset import WaymoDataset
 __all__ = [
     'KittiDataset', 'KittiMonoDataset', 'build_dataloader', 'DATASETS',
     'build_dataset', 'NuScenesDataset', 'NuScenesMonoDataset', 'LyftDataset',
+    'CustomNuScenesDataset',
     'ObjectSample', 'RandomFlip3D', 'ObjectNoise', 'GlobalRotScaleTrans',
     'PointShuffle', 'ObjectRangeFilter', 'PointsRangeFilter',
     'LoadPointsFromFile', 'S3DISSegDataset', 'S3DISDataset',

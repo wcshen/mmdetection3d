@@ -1,10 +1,12 @@
-_base_ = [
-    '../../../mmdetection3d/configs/_base_/datasets/nus-3d.py',
-    '../../../mmdetection3d/configs/_base_/default_runtime.py'
-]
+# _base_ = [
+#     '../../../mmdetection3d/configs/_base_/datasets/nus-3d.py',
+#     '../../../mmdetection3d/configs/_base_/default_runtime.py'
+# ]
 
-plugin=True
-plugin_dir='projects/mmdet3d_plugin/'
+_base_ = [
+    # '../_base_/datasets/kitti-3d-4class-plus.py',
+    '../_base_/default_runtime.py'
+]
 
 # If point cloud range is changed, the models should also change their point
 # cloud range accordingly
@@ -13,11 +15,9 @@ voxel_size = [0.2, 0.2, 8]
 
 img_norm_cfg = dict(
     mean=[103.530, 116.280, 123.675], std=[1.0, 1.0, 1.0], to_rgb=False)
-# For nuScenes we usually do 10-class detection
-class_names = [
-    'car', 'truck', 'construction_vehicle', 'bus', 'trailer', 'barrier',
-    'motorcycle', 'bicycle', 'pedestrian', 'traffic_cone'
-]
+
+
+class_names = ['Pedestrian', 'Cyclist', 'Car', 'Truck']
 
 input_modality = dict(
     use_lidar=False,
@@ -51,7 +51,7 @@ model = dict(
     pts_bbox_head=dict(
         type='Detr3DHead',
         num_query=900,
-        num_classes=10,
+        num_classes=4,
         in_channels=256,
         sync_cls_avg_factor=True,
         with_box_refine=True,
@@ -74,6 +74,7 @@ model = dict(
                             type='Detr3DCrossAtten',
                             pc_range=point_cloud_range,
                             num_points=1,
+                            num_cams=2, # FIXME(swc): only front_cam just now
                             embed_dims=256)
                     ],
                     feedforward_channels=512,
@@ -86,7 +87,7 @@ model = dict(
             pc_range=point_cloud_range,
             max_num=300,
             voxel_size=voxel_size,
-            num_classes=10), 
+            num_classes=4), 
         positional_encoding=dict(
             type='SinePositionalEncoding',
             num_feats=128,
@@ -113,8 +114,8 @@ model = dict(
             iou_cost=dict(type='IoUCost', weight=0.0), # Fake cost. This is just to make it compatible with DETR head. 
             pc_range=point_cloud_range))))
 
-dataset_type = 'NuScenesDataset'
-data_root = 'data/nuscenes/'
+dataset_type = 'PlusKittiDataset'
+data_root = 'data/kitti/'
 
 file_client_args = dict(backend='disk')
 
@@ -155,18 +156,18 @@ db_sampler = dict(
         file_client_args=file_client_args))
 
 train_pipeline = [
-    dict(type='LoadMultiViewImageFromFiles', to_float32=True),
+    dict(type='LoadMultiCamImagesFromFile', to_float32=True),
     dict(type='PhotoMetricDistortionMultiViewImage'),
     dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True, with_attr_label=False),
     dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='ObjectNameFilter', classes=class_names),
     dict(type='NormalizeMultiviewImage', **img_norm_cfg),
     dict(type='PadMultiViewImage', size_divisor=32),
-    dict(type='DefaultFormatBundle3D', class_names=class_names),
+    dict(type='DefaultFormatBundleMultiCam3D', class_names=class_names),
     dict(type='Collect3D', keys=['gt_bboxes_3d', 'gt_labels_3d', 'img'])
 ]
 test_pipeline = [
-    dict(type='LoadMultiViewImageFromFiles', to_float32=True),
+    dict(type='LoadMultiCamImagesFromFile', to_float32=True),
     dict(type='NormalizeMultiviewImage', **img_norm_cfg),
     dict(type='PadMultiViewImage', size_divisor=32),
     dict(
@@ -176,7 +177,7 @@ test_pipeline = [
         flip=False,
         transforms=[
             dict(
-                type='DefaultFormatBundle3D',
+                type='DefaultFormatBundleMultiCam3D',
                 class_names=class_names,
                 with_label=False),
             dict(type='Collect3D', keys=['img'])
@@ -186,21 +187,43 @@ test_pipeline = [
 
 data = dict(
     samples_per_gpu=1,
-    workers_per_gpu=4,
+    workers_per_gpu=1,
     train=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file=data_root + 'nuscenes_infos_train.pkl',
+        ann_file=data_root + 'Kitti_L4_data_mm3d_infos_train.pkl',
+        split='training',
         pipeline=train_pipeline,
         classes=class_names,
         modality=input_modality,
         test_mode=False,
-        use_valid_flag=True,
         # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
         # and box_type_3d='Depth' in sunrgbd and scannet dataset.
-        box_type_3d='LiDAR'),
-    val=dict(pipeline=test_pipeline, classes=class_names, modality=input_modality),
-    test=dict(pipeline=test_pipeline, classes=class_names, modality=input_modality))
+        box_type_3d='LiDAR',
+        file_client_args=file_client_args),
+    
+    val=dict(
+        type=dataset_type,
+        data_root=data_root,
+        ann_file=data_root + 'Kitti_L4_data_mm3d_infos_val.pkl',
+        split='training',
+        pipeline=test_pipeline,
+        modality=input_modality,
+        classes=class_names,
+        test_mode=True,
+        box_type_3d='LiDAR',
+        file_client_args=file_client_args),
+    test=dict(
+        type=dataset_type,
+        data_root=data_root,
+        ann_file=data_root + 'Kitti_L4_data_mm3d_infos_val.pkl',
+        split='training',
+        pipeline=test_pipeline,
+        modality=input_modality,
+        classes=class_names,
+        test_mode=True,
+        box_type_3d='LiDAR',
+        file_client_args=file_client_args))
 
 optimizer = dict(
     type='AdamW', 
@@ -222,4 +245,4 @@ total_epochs = 24
 evaluation = dict(interval=2, pipeline=test_pipeline)
 
 runner = dict(type='EpochBasedRunner', max_epochs=total_epochs)
-load_from='ckpts/fcos3d.pth'
+# load_from='ckpts/fcos3d.pth'

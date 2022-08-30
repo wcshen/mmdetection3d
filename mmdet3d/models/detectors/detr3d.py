@@ -5,7 +5,7 @@ from ..builder import DETECTORS
 from mmdet3d.core import bbox3d2result
 from .mvx_two_stage import MVXTwoStageDetector
 
-from projects.mmdet3d_plugin.models.utils.grid_mask import GridMask
+from ..utils.grid_mask import GridMask
 
 
 @DETECTORS.register_module()
