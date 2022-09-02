@@ -28,7 +28,7 @@ def get_thresholds(scores: np.ndarray, num_gt, num_sample_pts=41):
 
 
 def clean_data(gt_anno, dt_anno, current_class, difficulty):
-    CLASS_NAMES = ['car', 'pedestrian', 'cyclist']
+    CLASS_NAMES = ['car', 'pedestrian', 'cyclist', 'Truck']
     MIN_HEIGHT = [40, 25, 25]
     MAX_OCCLUSION = [0, 1, 2]
     MAX_TRUNCATION = [0.15, 0.3, 0.5]
@@ -51,11 +51,11 @@ def clean_data(gt_anno, dt_anno, current_class, difficulty):
             valid_class = 0
         else:
             valid_class = -1
-        ignore = False
-        if ((gt_anno['occluded'][i] > MAX_OCCLUSION[difficulty])
-                or (gt_anno['truncated'][i] > MAX_TRUNCATION[difficulty])
-                or (height <= MIN_HEIGHT[difficulty])):
-            ignore = True
+        ignore = False  # FIXME(swc): height=0, so set alawys not ignore
+        # if ((gt_anno['occluded'][i] > MAX_OCCLUSION[difficulty])  # false
+        #         or (gt_anno['truncated'][i] > MAX_TRUNCATION[difficulty]) # false
+        #         or (height <= MIN_HEIGHT[difficulty])): 
+        #     ignore = True
         if valid_class == 1 and not ignore:
             ignored_gt.append(0)
             num_valid_gt += 1
@@ -72,7 +72,8 @@ def clean_data(gt_anno, dt_anno, current_class, difficulty):
         else:
             valid_class = -1
         height = abs(dt_anno['bbox'][i, 3] - dt_anno['bbox'][i, 1])
-        if height < MIN_HEIGHT[difficulty]:
+        # if height < MIN_HEIGHT[difficulty]: # FIXME(swc): changed to if 0, split difficulty?
+        if 0:
             ignored_dt.append(1)
         elif valid_class == 1:
             ignored_dt.append(0)
@@ -210,7 +211,7 @@ def compute_statistics_jit(overlaps,
                 continue
             if (ignored_threshold[j]):
                 continue
-            overlap = overlaps[j, i]
+            overlap = overlaps[j, i]  # FIXME(swc): j,i?
             dt_score = dt_scores[j]
             if (not compute_fp and (overlap > min_overlap)
                     and dt_score > valid_detection):
@@ -397,7 +398,7 @@ def calculate_iou_partly(gt_annos, dt_annos, metric, num_parts=50):
                                           dt_boxes).astype(np.float64)
         else:
             raise ValueError('unknown metric')
-        parted_overlaps.append(overlap_part)
+        parted_overlaps.append(overlap_part)  # NOTE(swc): row:gt   col:dt
         example_idx += num_part
     overlaps = []
     example_idx = 0
@@ -477,7 +478,7 @@ def eval_class(gt_annos,
     if num_examples < num_parts:
         num_parts = num_examples
     split_parts = get_split_parts(num_examples, num_parts)
-
+    # NOTE(swc): calculate_iou_partly
     rets = calculate_iou_partly(dt_annos, gt_annos, metric, num_parts)
     overlaps, parted_overlaps, total_dt_num, total_gt_num = rets
     N_SAMPLE_PTS = 41
@@ -619,7 +620,7 @@ def do_eval(gt_annos,
         if 'aos' in eval_types:
             mAP11_aos = get_mAP11(ret['orientation'])
             mAP40_aos = get_mAP40(ret['orientation'])
-
+    # NOTE(swc): get mAP entry
     mAP11_bev = None
     mAP40_bev = None
     if 'bev' in eval_types:
@@ -678,19 +679,19 @@ def kitti_eval(gt_annos,
     assert len(eval_types) > 0, 'must contain at least one evaluation type'
     if 'aos' in eval_types:
         assert 'bbox' in eval_types, 'must evaluate bbox when evaluating aos'
-    overlap_0_7 = np.array([[0.7, 0.5, 0.5, 0.7,
-                             0.5], [0.7, 0.5, 0.5, 0.7, 0.5],
-                            [0.7, 0.5, 0.5, 0.7, 0.5]])
-    overlap_0_5 = np.array([[0.7, 0.5, 0.5, 0.7, 0.5],
-                            [0.5, 0.25, 0.25, 0.5, 0.25],
-                            [0.5, 0.25, 0.25, 0.5, 0.25]])
-    min_overlaps = np.stack([overlap_0_7, overlap_0_5], axis=0)  # [2, 3, 5]
+    overlap_0_7 = np.array([[0.7, 0.5, 0.5, 0.7], 
+                            [0.7, 0.5, 0.5, 0.7],
+                            [0.7, 0.5, 0.5, 0.7]])
+    
+    overlap_0_5 = np.array([[0.7, 0.5, 0.5, 0.5],
+                            [0.5, 0.25, 0.25, 0.5],
+                            [0.5, 0.25, 0.25, 0.5]])
+    min_overlaps = np.stack([overlap_0_7, overlap_0_5], axis=0)  # [2, 3, 4]
     class_to_name = {
         0: 'Car',
         1: 'Pedestrian',
         2: 'Cyclist',
-        3: 'Van',
-        4: 'Person_sitting',
+        3: 'Truck',  # FIXME(swc): how to add truck? [DONE]
     }
     name_to_class = {v: n for n, v in class_to_name.items()}
     if not isinstance(current_classes, (list, tuple)):

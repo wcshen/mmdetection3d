@@ -204,6 +204,7 @@ def train_detector(model,
 
     runner_type = 'EpochBasedRunner' if 'runner' not in cfg else cfg.runner[
         'type']
+    # NOTE(swc): build dataloader
     data_loaders = [
         build_mmdet_dataloader(
             ds,

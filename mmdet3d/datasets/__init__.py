@@ -8,6 +8,9 @@ from .kitti_mono_dataset import KittiMonoDataset
 from .lyft_dataset import LyftDataset
 from .nuscenes_dataset import NuScenesDataset
 from .nuscenes_mono_dataset import NuScenesMonoDataset
+
+from .plus_kitti_datasets import PlusKittiDataset
+
 # yapf: disable
 from .pipelines import (AffineResize, BackgroundPointsFilter, GlobalAlignment,
                         GlobalRotScaleTrans, IndoorPatchPointSample,
@@ -19,7 +22,7 @@ from .pipelines import (AffineResize, BackgroundPointsFilter, GlobalAlignment,
                         PointShuffle, PointsRangeFilter, RandomDropPointsColor,
                         RandomFlip3D, RandomJitterPoints, RandomRotate,
                         RandomShiftScale, RangeLimitedRandomCrop,
-                        VoxelBasedPointSampler)
+                        VoxelBasedPointSampler, LoadMultiCamImagesFromFile, DefaultFormatBundleMultiCam3D)
 # yapf: enable
 from .s3dis_dataset import S3DISDataset, S3DISSegDataset
 from .scannet_dataset import (ScanNetDataset, ScanNetInstanceSegDataset,
@@ -43,5 +46,6 @@ __all__ = [
     'VoxelBasedPointSampler', 'get_loading_pipeline', 'RandomDropPointsColor',
     'RandomJitterPoints', 'ObjectNameFilter', 'AffineResize',
     'RandomShiftScale', 'LoadPointsFromDict', 'PIPELINES',
-    'RangeLimitedRandomCrop', 'RandomRotate', 'MultiViewWrapper'
+    'RangeLimitedRandomCrop', 'RandomRotate', 'MultiViewWrapper', 'PlusKittiDataset',
+    'LoadMultiCamImagesFromFile', 'DefaultFormatBundleMultiCam3D'
 ]

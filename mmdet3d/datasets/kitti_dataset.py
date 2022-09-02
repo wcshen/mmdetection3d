@@ -355,7 +355,7 @@ class KittiDataset(Custom3DDataset):
         Returns:
             dict[str, float]: Results of each evaluation metric.
         """
-        result_files, tmp_dir = self.format_results(results, pklfile_prefix)
+        result_files, tmp_dir = self.format_results(results, pklfile_prefix)  # result_files: a list of all annos of each frame
         from mmdet3d.core.evaluation import kitti_eval
         gt_annos = [info['annos'] for info in self.data_infos]
 
@@ -381,7 +381,7 @@ class KittiDataset(Custom3DDataset):
                 ap_result_str, ap_dict = kitti_eval(
                     gt_annos, result_files, self.CLASSES, eval_types=['bbox'])
             else:
-                ap_result_str, ap_dict = kitti_eval(gt_annos, result_files,
+                ap_result_str, ap_dict = kitti_eval(gt_annos, result_files,  # NOTE(swc): kitti_eval entry
                                                     self.CLASSES)
             print_log('\n' + ap_result_str, logger=logger)
 
@@ -422,7 +422,7 @@ class KittiDataset(Custom3DDataset):
             info = self.data_infos[idx]
             sample_idx = info['image']['image_idx']
             image_shape = info['image']['image_shape'][:2]
-            box_dict = self.convert_valid_bboxes(pred_dicts, info)
+            box_dict = self.convert_valid_bboxes(pred_dicts, info)  # convert box format
             anno = {
                 'name': [],
                 'truncated': [],
@@ -662,7 +662,7 @@ class KittiDataset(Custom3DDataset):
         P2 = info['calib']['P2'].astype(np.float32)
         img_shape = info['image']['image_shape']
         P2 = box_preds.tensor.new_tensor(P2)
-
+        # FIXME(swc): should be the same with label
         box_preds_camera = box_preds.convert_to(Box3DMode.CAM, rect @ Trv2c)
 
         box_corners = box_preds_camera.corners

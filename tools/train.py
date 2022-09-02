@@ -7,6 +7,9 @@ import time
 import warnings
 from os import path as osp
 
+import datetime # for work_dir
+import pytz
+
 import mmcv
 import torch
 import torch.distributed as dist
@@ -128,12 +131,14 @@ def main():
         torch.backends.cudnn.benchmark = True
 
     # work_dir is determined in this priority: CLI > segment in file > filename
+    current_time = "{0:%Y-%m-%dT%H-%M-%S/}".format(datetime.datetime.now(tz=pytz.timezone("Asia/Chongqing")))
     if args.work_dir is not None:
         # update configs according to CLI args if args.work_dir is not None
         cfg.work_dir = args.work_dir
     elif cfg.get('work_dir', None) is None:
         # use config filename as default work_dir if cfg.work_dir is None
-        cfg.work_dir = osp.join('./work_dirs',
+        work_dirs = './work_dirs/' + current_time
+        cfg.work_dir = osp.join(work_dirs,
                                 osp.splitext(osp.basename(args.config))[0])
     if args.resume_from is not None:
         cfg.resume_from = args.resume_from

@@ -360,7 +360,7 @@ def rotate_iou_gpu_eval(boxes, query_boxes, criterion=-1, device_id=0):
     query_boxes = query_boxes.astype(np.float32)
     N = boxes.shape[0]
     K = query_boxes.shape[0]
-    iou = np.zeros((N, K), dtype=np.float32)
+    iou = np.zeros((N, K), dtype=np.float32)  # NOTE(swc): iou_mat_shape
     if N == 0 or K == 0:
         return iou
     threadsPerBlock = 8 * 8

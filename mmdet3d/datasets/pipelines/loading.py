@@ -375,7 +375,8 @@ class LoadPointsFromFile(object):
                  use_dim=[0, 1, 2],
                  shift_height=False,
                  use_color=False,
-                 file_client_args=dict(backend='disk')):
+                 file_client_args=dict(backend='disk'),
+                 point_type='float32'):
         self.shift_height = shift_height
         self.use_color = use_color
         if isinstance(use_dim, int):
@@ -389,6 +390,8 @@ class LoadPointsFromFile(object):
         self.use_dim = use_dim
         self.file_client_args = file_client_args.copy()
         self.file_client = None
+        
+        self.point_type = point_type
 
     def _load_points(self, pts_filename):
         """Private function to load point clouds data.
@@ -403,13 +406,20 @@ class LoadPointsFromFile(object):
             self.file_client = mmcv.FileClient(**self.file_client_args)
         try:
             pts_bytes = self.file_client.get(pts_filename)
-            points = np.frombuffer(pts_bytes, dtype=np.float32)
+            # NOTE(swc): dtype should be the same with bin file
+            if self.point_type == 'float32':
+                points = np.frombuffer(pts_bytes, dtype=np.float32)
+            elif self.point_type == 'float64':
+                points = np.frombuffer(pts_bytes, dtype=np.float64)
         except ConnectionError:
             mmcv.check_file_exist(pts_filename)
             if pts_filename.endswith('.npy'):
                 points = np.load(pts_filename)
             else:
-                points = np.fromfile(pts_filename, dtype=np.float32)
+                if self.point_type == 'float32':
+                    points = np.fromfile(pts_filename, dtype=np.float32)
+                elif self.point_type == 'float64':
+                    points = np.fromfile(pts_filename, dtype=np.float64)
 
         return points
 
@@ -690,4 +700,76 @@ class LoadAnnotations3D(LoadAnnotations):
         repr_str += f'{indent_str}with_seg={self.with_seg}, '
         repr_str += f'{indent_str}with_bbox_depth={self.with_bbox_depth}, '
         repr_str += f'{indent_str}poly2mask={self.poly2mask})'
+        return repr_str
+
+
+@PIPELINES.register_module()
+class LoadMultiCamImagesFromFile:
+    """Load images of multiple cameras
+
+    Args:
+        to_float32 (bool): Whether to convert the loaded image to a float32
+            numpy array. If set to False, the loaded image is an uint8 array.
+            Defaults to False.
+        color_type (str): The flag argument for :func:`mmcv.imfrombytes`.
+            Defaults to 'color'.
+        file_client_args (dict): Arguments to instantiate a FileClient.
+            See :class:`mmcv.fileio.FileClient` for details.
+            Defaults to ``dict(backend='disk')``.
+    """
+
+    def __init__(self,
+                 to_float32=False,
+                 color_type='color',
+                 channel_order='bgr',
+                 file_client_args=dict(backend='disk')):
+        self.to_float32 = to_float32
+        self.color_type = color_type
+        self.channel_order = channel_order
+        self.file_client_args = file_client_args.copy()
+        self.file_client = None
+
+    def __call__(self, results):
+        """Call functions to load images of multiple cameras and get image meta information.
+
+        in one dict
+
+        Args:
+            results (dict): Result dict from :obj:`mmdet.CustomDataset`.
+
+        Returns:
+            dict: The dict contains loaded images and meta information.
+        """
+
+        if self.file_client is None:
+            self.file_client = mmcv.FileClient(**self.file_client_args)
+
+        results['filename'] = []
+        results['ori_filename'] = []
+        results['img'] = []
+        results['img_shape'] = []
+        results['ori_shape'] = []
+        results['img_fields'] = ['img']
+
+        for filename in results['img_info']:
+            img_bytes = self.file_client.get(filename)
+            img = mmcv.imfrombytes(
+                img_bytes, flag=self.color_type, channel_order=self.channel_order)
+            if self.to_float32:
+                img = img.astype(np.float32)
+
+            results['filename'].append(filename)
+            results['ori_filename'].append(filename)
+            results['img'].append(img)
+            results['img_shape'].append(img.shape)
+            results['ori_shape'].append(img.shape)
+
+        return results
+
+    def __repr__(self):
+        repr_str = (f'{self.__class__.__name__}('
+                    f'to_float32={self.to_float32}, '
+                    f"color_type='{self.color_type}', "
+                    f"channel_order='{self.channel_order}', "
+                    f'file_client_args={self.file_client_args})')
         return repr_str

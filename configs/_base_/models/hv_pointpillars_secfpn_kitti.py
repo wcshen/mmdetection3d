@@ -1,12 +1,12 @@
-voxel_size = [0.16, 0.16, 4]
+voxel_size = [0.25, 0.25, 8]
 
 model = dict(
     type='VoxelNet',
     voxel_layer=dict(
-        max_num_points=32,  # max_points_per_voxel
-        point_cloud_range=[0, -39.68, -3, 69.12, 39.68, 1],
+        max_num_points=48,  # max_points_per_voxel
+        point_cloud_range=[0, -10.0, -2.0, 150.0, 10.0, 6.0],
         voxel_size=voxel_size,
-        max_voxels=(16000, 40000)  # (training, testing) max_voxels
+        max_voxels=(32000, 32000)  # (training, testing) max_voxels
     ),
     voxel_encoder=dict(
         type='PillarFeatureNet',
@@ -14,9 +14,9 @@ model = dict(
         feat_channels=[64],
         with_distance=False,
         voxel_size=voxel_size,
-        point_cloud_range=[0, -39.68, -3, 69.12, 39.68, 1]),
+        point_cloud_range=[0, -10.0, -2.0, 150.0, 10.0, 6.0]),
     middle_encoder=dict(
-        type='PointPillarsScatter', in_channels=64, output_shape=[496, 432]),
+        type='PointPillarsScatter', in_channels=64, output_shape=[80, 600]),
     backbone=dict(
         type='SECOND',
         in_channels=64,
@@ -30,7 +30,7 @@ model = dict(
         out_channels=[128, 128, 128]),
     bbox_head=dict(
         type='Anchor3DHead',
-        num_classes=3,
+        num_classes=4,
         in_channels=384,
         feat_channels=384,
         use_direction_classifier=True,
@@ -38,11 +38,16 @@ model = dict(
         anchor_generator=dict(
             type='AlignedAnchor3DRangeGenerator',
             ranges=[
-                [0, -39.68, -0.6, 69.12, 39.68, -0.6],
-                [0, -39.68, -0.6, 69.12, 39.68, -0.6],
-                [0, -39.68, -1.78, 69.12, 39.68, -1.78],
+                [0, -10.0, -0.6, 150.0, 10.0, -0.6],  # FIXME(swc): z_range need to be confirmed
+                [0, -10.0, -0.6, 150.0, 10.0, -0.6],
+                [0, -10.0, -1.78, 150.0, 10.0, -1.78],
+                [0, -10.0, -0.3, 150.0, 10.0, -0.3]
             ],
-            sizes=[[0.8, 0.6, 1.73], [1.76, 0.6, 1.73], [3.9, 1.6, 1.56]],
+            sizes=[[0.8, 0.6, 1.73], # ped
+                   [1.76, 0.6, 1.73], # cyclist
+                   [4.63, 1.97, 1.74], # car
+                   [12.5, 2.94, 3.47],  # truck
+                   ],
             rotations=[0, 1.57],
             reshape_out=False),
         diff_rad_by_sin=True,
@@ -79,6 +84,13 @@ model = dict(
                 pos_iou_thr=0.6,
                 neg_iou_thr=0.45,
                 min_pos_iou=0.45,
+                ignore_iof_thr=-1),
+            dict(  # for Truck
+                type='MaxIoUAssigner',
+                iou_calculator=dict(type='BboxOverlapsNearest3D'),
+                pos_iou_thr=0.55,
+                neg_iou_thr=0.4,
+                min_pos_iou=0.4,
                 ignore_iof_thr=-1),
         ],
         allowed_border=0,
