@@ -377,8 +377,8 @@ class PlusKittiDataset(KittiDataset):
         limit_range = box_preds.tensor.new_tensor(self.pcd_limit_range)
         valid_pcd_inds = ((box_preds.center > limit_range[:3]) &
                           (box_preds.center < limit_range[3:]))
-        valid_inds = valid_cam_inds & valid_pcd_inds.all(-1)
-
+        # valid_inds = valid_cam_inds & valid_pcd_inds.all(-1)
+        valid_inds = valid_pcd_inds.all(-1)
         if valid_inds.sum() > 0:
             return dict(
                 bbox=box_2d_preds[valid_inds, :].numpy(),
@@ -475,7 +475,7 @@ class PlusKittiDataset(KittiDataset):
                     gt_annos, result_files, self.CLASSES, eval_types=['bbox'])
             else:
                 ap_result_str, ap_dict = kitti_eval(gt_annos, result_files,  # NOTE(swc): kitti_eval entry
-                                                    self.CLASSES)
+                                                    self.CLASSES, eval_types=['bev', '3d']) # add eval type 
             print_log('\n' + ap_result_str, logger=logger)
 
         if tmp_dir is not None:
