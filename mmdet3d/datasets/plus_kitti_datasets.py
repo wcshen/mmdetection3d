@@ -61,7 +61,7 @@ class PlusKittiDataset(KittiDataset):
                  filter_empty_gt=True,
                  test_mode=False,
                  load_interval=1,
-                 pcd_limit_range=[0, -2, -3, 100.0, 10, 6.0],
+                 pcd_limit_range=[0, -10, -3, 100.0, 10, 6.0],
                  **kwargs):
         super().__init__(
             data_root=data_root,
@@ -237,7 +237,9 @@ class PlusKittiDataset(KittiDataset):
                 'dimensions': [],
                 'location': [],
                 'rotation_y': [],
-                'score': []
+                'score': [],
+                'dt_boxes': [],
+                'scores': []
             }
             if len(box_dict['bbox']) > 0:
                 box_2d_preds = box_dict['bbox']
@@ -262,6 +264,8 @@ class PlusKittiDataset(KittiDataset):
                     anno['rotation_y'].append(box[6])
                     anno['score'].append(score)
 
+                    anno['dt_boxes'].append(box_lidar)
+                    anno['scores'].append(score)
                 anno = {k: np.stack(v) for k, v in anno.items()}
                 annos.append(anno)
             else:
@@ -275,6 +279,8 @@ class PlusKittiDataset(KittiDataset):
                     'location': np.zeros([0, 3]),
                     'rotation_y': np.array([]),
                     'score': np.array([]),
+                    'dt_boxes': np.zeros([0, 7]),
+                    'scores': np.array([]),
                 }
                 annos.append(anno)
 
@@ -415,6 +421,59 @@ class PlusKittiDataset(KittiDataset):
         
         return cam_anno
     
+    def bbox2result_pcdet(self,
+                          net_outputs,
+                          class_names,
+                          pklfile_prefix=None,
+                          submission_prefix=None):
+        assert len(net_outputs) == len(self.data_infos), \
+            'invalid list length of network outputs'
+        if submission_prefix is not None:
+            mmcv.mkdir_or_exist(submission_prefix)
+
+        det_annos = []
+        print('\nConverting prediction to pcdet format')
+        for idx, pred_dicts in enumerate(
+                mmcv.track_iter_progress(net_outputs)):
+            annos = []
+            info = self.data_infos[idx]
+            sample_idx = info['image']['image_idx']
+            anno = {
+                    'dt_boxes': [],
+                    'name': [],
+                    'scores': []
+            }
+            if len(pred_dicts['boxes_3d']) > 0:
+                scores = pred_dicts['scores_3d']
+                box_preds_lidar = pred_dicts['boxes_3d']
+                label_preds = pred_dicts['labels_3d']
+
+                for box_lidar, score, label in zip(
+                        box_preds_lidar, scores, label_preds):
+                    anno['dt_boxes'].append(box_lidar)
+                    anno['name'].append(class_names[int(label)])
+                    anno['scores'].append(score)
+
+                anno = {k: np.stack(v) for k, v in anno.items()}
+                annos.append(anno)
+            else:
+                anno = {
+                    'dt_boxes': np.zeros([0, 7]),
+                    'name': np.array([]),
+                    'scores': np.array([]),
+                }
+                annos.append(anno)
+
+            det_annos += annos
+
+        if pklfile_prefix is not None:
+            if not pklfile_prefix.endswith(('.pkl', '.pickle')):
+                out = f'{pklfile_prefix}.pkl'
+            mmcv.dump(det_annos, out)
+            print(f'Result is saved to {out}.')
+
+        return det_annos
+
     def evaluate(self,
                  results,
                  metric=None,
@@ -423,7 +482,8 @@ class PlusKittiDataset(KittiDataset):
                  submission_prefix=None,
                  show=False,
                  out_dir=None,
-                 pipeline=None):
+                 pipeline=None,
+                 eval_result_dir=None):
         """Evaluation in KITTI protocol.
 
         Args:
@@ -451,6 +511,16 @@ class PlusKittiDataset(KittiDataset):
         result_files, tmp_dir = self.format_results(results, pklfile_prefix)  # result_files: a list of all annos of each frame
         from mmdet3d.core.evaluation import kitti_eval
         gt_annos = [self.anno_lidar2cam(info['annos'], info['calib']) for info in self.data_infos]
+        
+        # to pcdet format
+        from mmdet3d.core.evaluation import get_formatted_results
+        det_pcdet = self.bbox2result_pcdet(results, self.CLASSES, pklfile_prefix)
+        gt_annos_pcdet = []
+        for info in self.data_infos:
+            gt_boxes = info['annos']['gt_boxes_lidar'] 
+            gt_names = info['annos']['name'] 
+            gt_anno = {'gt_boxes': gt_boxes, 'name': gt_names}
+            gt_annos_pcdet.append(gt_anno)
 
         if isinstance(result_files, dict):
             ap_dict = dict()
@@ -476,8 +546,18 @@ class PlusKittiDataset(KittiDataset):
             else:
                 ap_result_str, ap_dict = kitti_eval(gt_annos, result_files,  # NOTE(swc): kitti_eval entry
                                                     self.CLASSES, eval_types=['bev', '3d']) # add eval type 
-            print_log('\n' + ap_result_str, logger=logger)
+                
+                result_str, result_difficulty = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, det_pcdet, 0, 0,
+                 '/home/rongbo.ma/mmdetection3d/debug', False)
+                
+                print_log('\n' + '****************pcdet eval start.*****************', logger=logger)
+                print_log('\n' + result_str, logger=logger)
+                print_log('\n' + '****************pcdet eval done.*****************', logger=logger)
 
+            print_log('\n' + ap_result_str, logger=logger)
+        if eval_result_dir is not None:
+            with open(os.path.join(eval_result_dir, 'human_readable_results' + '.txt'), 'w') as f:
+                f.write(result_str)
         if tmp_dir is not None:
             tmp_dir.cleanup()
         if show or out_dir:
