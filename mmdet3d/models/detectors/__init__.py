@@ -18,6 +18,7 @@ from .smoke_mono3d import SMOKEMono3D
 from .ssd3dnet import SSD3DNet
 from .votenet import VoteNet
 from .voxelnet import VoxelNet
+from .transfusion import TransFusionDetector
 
 from .obj_dgcnn import ObjDGCNN
 # from .detr3d import Detr3D
@@ -27,5 +28,5 @@ __all__ = [
     'DynamicMVXFasterRCNN', 'MVXFasterRCNN', 'PartA2', 'VoteNet', 'H3DNet',
     'CenterPoint', 'SSD3DNet', 'ImVoteNet', 'SingleStageMono3DDetector',
     'FCOSMono3D', 'ImVoxelNet', 'GroupFree3DNet', 'PointRCNN', 'SMOKEMono3D',
-    'MinkSingleStage3DDetector', 'SASSD', 'ObjDGCNN'
+    'MinkSingleStage3DDetector', 'SASSD', 'ObjDGCNN', 'TransFusionDetector'
 ]
