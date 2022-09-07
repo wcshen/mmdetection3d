@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-CUDA_VISIBLE_DEVICES="5,6,7,4" \
+export NCCL_P2P_DISABLE=1 
+
+CUDA_VISIBLE_DEVICES="1,2,3,4,5,6" \
 bash tools/dist_train.sh \
-configs/pointpillars/hv_pointpillars_secfpn_6x4_160e_plus-kitti-3d-4class.py\
-4 \
---work-dir work_dirs/plus_pp_150_4class
+configs/transfusion_plus_pillar_L.py \
+6 \
+--work-dir work_dirs/plus_transfusion \
+--deterministic
