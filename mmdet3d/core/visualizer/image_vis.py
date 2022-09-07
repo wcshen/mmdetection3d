@@ -106,22 +106,43 @@ def draw_lidar_bbox3d_on_img(bboxes3d,
         thickness (int, optional): The thickness of bboxes. Default: 1.
     """
     img = raw_img.copy()
-    corners_3d = bboxes3d.corners
+    corners_3d = bboxes3d.corners  # shape: (N,8,3)
     num_bbox = corners_3d.shape[0]
     pts_4d = np.concatenate(
         [corners_3d.reshape(-1, 3),
-         np.ones((num_bbox * 8, 1))], axis=-1)
+         np.ones((num_bbox * 8, 1))], axis=-1)  # (Nx8,4)
     lidar2img_rt = copy.deepcopy(lidar2img_rt).reshape(4, 4)
     if isinstance(lidar2img_rt, torch.Tensor):
         lidar2img_rt = lidar2img_rt.cpu().numpy()
-    pts_2d = pts_4d @ lidar2img_rt.T
+    # pts_2d = pts_4d @ lidar2img_rt.T
+    pts_2d = np.matmul(lidar2img_rt, pts_4d.T).T  # (Nx8,4)
 
-    pts_2d[:, 2] = np.clip(pts_2d[:, 2], a_min=1e-5, a_max=1e5)
-    pts_2d[:, 0] /= pts_2d[:, 2]
-    pts_2d[:, 1] /= pts_2d[:, 2]
-    imgfov_pts_2d = pts_2d[..., :2].reshape(num_bbox, 8, 2)
+    # pts_2d[:, 2] = np.clip(pts_2d[:, 2], a_min=1e-5, a_max=1e5)
+    # pts_2d[:, 0] /= pts_2d[:, 2]
+    # pts_2d[:, 1] /= pts_2d[:, 2]
+    # imgfov_pts_2d = pts_2d[..., :2].reshape(num_bbox, 8, 2)
 
-    return plot_rect3d_on_img(img, num_bbox, imgfov_pts_2d, color, thickness)
+    valid_box = []
+    valid_box_num = 0
+    for i in range(num_bbox):
+        this_pts_2d = pts_2d[i * 8:(i + 1) * 8]
+        have_negative_z = False
+        for corner_idx in range(8):
+            camera_z = this_pts_2d[corner_idx, 2]
+            if camera_z < 0:
+                have_negative_z = True
+                break
+        if have_negative_z:
+            continue
+        valid_box_num += 1
+        this_pts_2d[:, 0] /= this_pts_2d[:, 2]
+        this_pts_2d[:, 1] /= this_pts_2d[:, 2]
+        valid_box.append(this_pts_2d[:, :2])
+
+    if valid_box_num > 0:
+        valid_box = np.concatenate(valid_box, axis=0).reshape(valid_box_num, 8, 2)
+
+    return plot_rect3d_on_img(img, valid_box_num, valid_box, color, thickness)
 
 
 # TODO: remove third parameter in all functions here in favour of img_metas

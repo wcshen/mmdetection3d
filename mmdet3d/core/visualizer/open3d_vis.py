@@ -98,12 +98,14 @@ def _draw_bboxes(bbox3d,
         yaw[rot_axis] = bbox3d[i, 6]
         rot_mat = geometry.get_rotation_matrix_from_xyz(yaw)
 
+        # TODO(swc): center_mode need to be confirmed [done]
         if center_mode == 'lidar_bottom':
             center[rot_axis] += dim[
                 rot_axis] / 2  # bottom center to gravity center
         elif center_mode == 'camera_bottom':
             center[rot_axis] -= dim[
                 rot_axis] / 2  # bottom center to gravity center
+
         box3d = geometry.OrientedBoundingBox(center, rot_mat, dim)
 
         line_set = geometry.LineSet.create_from_oriented_bounding_box(box3d)
