@@ -1,9 +1,14 @@
+_base_ = [
+    './data_2class_0_100m.py',
+    './model_2class_0_100m.py',
+    '../_base_/schedules/cyclic_40e.py', '../_base_/default_runtime.py'
+]
+
+point_cloud_range = [0, -10.0, -2.0, 100.0, 10.0, 6.0]
 # dataset settings
-dataset_type = 'PlusKittiDataset'
 data_root = 'data/L4E_origin_data/'
-class_names = ['Pedestrian', 'Cyclist', 'Car', 'Truck']
-point_cloud_range = [0, -10.0, -2.0, 150.0, 10.0, 6.0]
-input_modality = dict(use_lidar=True, use_camera=False)
+class_names = ['Car', 'Truck']
+# PointPillars adopted a different sampling strategies among classes
 
 file_client_args = dict(backend='disk')
 # Uncomment the following if use ceph or other file clients.
@@ -24,9 +29,9 @@ db_sampler = dict(
     rate=1.0,
     prepare=dict(
         filter_by_difficulty=[-1],
-        filter_by_min_points=dict(Car=5, Pedestrian=10, Cyclist=10)),
+        filter_by_min_points=dict(Car=5, Pedestrian=5, Cyclist=5)),
     classes=class_names,
-    sample_groups=dict(Car=12, Pedestrian=6, Cyclist=6),
+    sample_groups=dict(Car=15, Pedestrian=15, Cyclist=15),
     points_loader=dict(
         type='LoadPointsFromFile',
         coord_type='LIDAR',
@@ -35,6 +40,7 @@ db_sampler = dict(
         file_client_args=file_client_args),
     file_client_args=file_client_args)
 
+# PointPillars uses different augmentation hyper parameters
 train_pipeline = [
     dict(
         type='LoadPointsFromFile',
@@ -48,13 +54,7 @@ train_pipeline = [
         with_bbox_3d=True,
         with_label_3d=True,
         file_client_args=file_client_args),
-    # dict(type='ObjectSample', db_sampler=db_sampler),
-    dict(
-        type='ObjectNoise',
-        num_try=100,
-        translation_std=[1.0, 1.0, 0.5],
-        global_rot_range=[0.0, 0.0],
-        rot_range=[-0.78539816, 0.78539816]),
+    # dict(type='ObjectSample', db_sampler=db_sampler, use_ground_plane=True),
     dict(type='RandomFlip3D', flip_ratio_bev_horizontal=0.5),
     dict(
         type='GlobalRotScaleTrans',
@@ -72,8 +72,13 @@ test_pipeline = [
         coord_type='LIDAR',
         load_dim=4,
         use_dim=4,
-        point_type='float64',
-        file_client_args=file_client_args,),
+        file_client_args=file_client_args,
+        point_type='float64'),
+    
+    # dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
+    # dict(type='DefaultFormatBundle3D', class_names=class_names, with_label=False),
+    # dict(type='Collect3D', keys=['points'])
+    
     dict(
         type='MultiScaleFlipAug3D',
         img_scale=(1333, 800),
@@ -95,8 +100,7 @@ test_pipeline = [
             dict(type='Collect3D', keys=['points'])
         ])
 ]
-# construct a pipeline for data and gt loading in show function
-# please keep its loading function consistent with test_pipeline (e.g. client)
+
 eval_pipeline = [
     dict(
         type='LoadPointsFromFile',
@@ -113,51 +117,22 @@ eval_pipeline = [
 ]
 
 data = dict(
-    samples_per_gpu=8,
-    workers_per_gpu=4,
-    train=dict(
-        type='RepeatDataset',
-        times=2,
-        dataset=dict(
-            type=dataset_type,
-            data_root=data_root,
-            ann_file=data_root + 'Kitti_L4_data_mm3d_infos_train.pkl',
-            split='training',
-            pts_prefix='pointcloud',
-            pipeline=train_pipeline,
-            modality=input_modality,
-            classes=class_names,
-            test_mode=False,
-            pcd_limit_range=point_cloud_range,
-            # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
-            # and box_type_3d='Depth' in sunrgbd and scannet dataset.
-            box_type_3d='LiDAR',
-            file_client_args=file_client_args)),
-    val=dict(
-        type=dataset_type,
-        data_root=data_root,
-        ann_file=data_root + 'Kitti_L4_data_mm3d_infos_val.pkl',
-        split='training',
-        pts_prefix='pointcloud',
-        pipeline=test_pipeline,
-        modality=input_modality,
-        classes=class_names,
-        test_mode=True,
-        pcd_limit_range=point_cloud_range,
-        box_type_3d='LiDAR',
-        file_client_args=file_client_args),
-    test=dict(
-        type=dataset_type,
-        data_root='data/L4E_origin_benchmark/',
-        ann_file='data/L4E_origin_benchmark/Kitti_L4_data_mm3d_infos_val.pkl',
-        split='training',
-        pts_prefix='pointcloud',
-        pipeline=test_pipeline,
-        modality=input_modality,
-        classes=class_names,
-        pcd_limit_range=point_cloud_range,
-        test_mode=True,
-        box_type_3d='LiDAR',
-        file_client_args=file_client_args))
+    train=dict(dataset=dict(pipeline=train_pipeline, classes=class_names)),
+    val=dict(pipeline=test_pipeline, classes=class_names),
+    test=dict(pipeline=test_pipeline, classes=class_names))
 
-evaluation = dict(interval=10, pipeline=eval_pipeline)
+# In practice PointPillars also uses a different schedule
+# optimizer
+lr = 0.001
+optimizer = dict(lr=lr)
+# max_norm=35 is slightly better than 10 for PointPillars in the earlier
+# development of the codebase thus we keep the setting. But we does not
+# specifically tune this parameter.
+optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
+# PointPillars usually need longer schedule than second, we simply double
+# the training schedule. Do remind that since we use RepeatDataset and
+# repeat factor is 2, so we actually train 160 epochs.
+runner = dict(max_epochs=80)
+
+# Use evaluation interval=2 reduce the number of evaluation timese
+evaluation = dict(interval=5)

@@ -1,8 +1,8 @@
 # dataset settings
 dataset_type = 'PlusKittiDataset'
 data_root = 'data/L4E_origin_data/'
-class_names = ['Pedestrian', 'Cyclist', 'Car', 'Truck']
-point_cloud_range = [0, -10.0, -2.0, 150.0, 10.0, 6.0]
+class_names = ['Car', 'Truck']
+point_cloud_range = [0, -10.0, -2.0, 100.0, 10.0, 6.0]
 input_modality = dict(use_lidar=True, use_camera=False)
 
 file_client_args = dict(backend='disk')
@@ -117,7 +117,7 @@ data = dict(
     workers_per_gpu=4,
     train=dict(
         type='RepeatDataset',
-        times=2,
+        times=1,
         dataset=dict(
             type=dataset_type,
             data_root=data_root,
