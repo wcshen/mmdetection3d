@@ -505,9 +505,12 @@ class PlusKittiDataset(KittiDataset):
             data_info = self.data_infos[i]
             pts_path = data_info['point_cloud']['lidar_idx']
             file_name = f"{pts_path}.bin"
+            pts_filename = osp.join(self.root_split, self.pts_prefix, f'{pts_path}.bin')
             points, img_metas, img = self._extract_data(
                 i, pipeline, ['points', 'img_metas', 'img'])
-            points = points.numpy()
+            # print(points)
+            points = np.fromfile(pts_filename).reshape(-1, 4)
+            # points = points.numpy()
             # for now we convert points into depth mode
             points = Coord3DMode.convert_point(points, Coord3DMode.LIDAR,
                                                Coord3DMode.DEPTH)

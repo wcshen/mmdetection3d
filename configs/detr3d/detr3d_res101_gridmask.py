@@ -166,6 +166,25 @@ train_pipeline = [
     dict(type='DefaultFormatBundleMultiCam3D', class_names=class_names),
     dict(type='Collect3D', keys=['gt_bboxes_3d', 'gt_labels_3d', 'img'])
 ]
+
+val_pipeline = [
+    dict(type='LoadMultiCamImagesFromFile', to_float32=True),
+    dict(type='NormalizeMultiviewImage', **img_norm_cfg),
+    dict(type='PadMultiViewImage', size_divisor=32),
+    dict(
+        type='MultiScaleFlipAug3D',
+        img_scale=(1333, 800),
+        pts_scale_ratio=1,
+        flip=False,
+        transforms=[
+            dict(
+                type='DefaultFormatBundleMultiCam3D',
+                class_names=class_names,
+                with_label=False),
+            dict(type='Collect3D', keys=['img'])
+        ])
+]
+
 test_pipeline = [
     dict(type='LoadMultiCamImagesFromFile', to_float32=True),
     dict(type='NormalizeMultiviewImage', **img_norm_cfg),
@@ -207,7 +226,7 @@ data = dict(
         data_root=data_root,
         ann_file=data_root + 'Kitti_L4_data_mm3d_infos_val.pkl',
         split='training',
-        pipeline=test_pipeline,
+        pipeline=val_pipeline,
         modality=input_modality,
         classes=class_names,
         test_mode=True,
@@ -245,4 +264,4 @@ total_epochs = 24
 evaluation = dict(interval=2, pipeline=test_pipeline)
 
 runner = dict(type='EpochBasedRunner', max_epochs=total_epochs)
-# load_from='ckpts/fcos3d.pth'
+load_from='checkpoints/dd3d_det_final.pth'

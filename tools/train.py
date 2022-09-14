@@ -131,15 +131,18 @@ def main():
         torch.backends.cudnn.benchmark = True
 
     # work_dir is determined in this priority: CLI > segment in file > filename
-    current_time = "{0:%Y-%m-%dT%H-%M-%S/}".format(datetime.datetime.now(tz=pytz.timezone("Asia/Chongqing")))
-    if args.work_dir is not None:
-        # update configs according to CLI args if args.work_dir is not None
-        cfg.work_dir = args.work_dir
-    elif cfg.get('work_dir', None) is None:
-        # use config filename as default work_dir if cfg.work_dir is None
-        work_dirs = './work_dirs/' + current_time
-        cfg.work_dir = osp.join(work_dirs,
-                                osp.splitext(osp.basename(args.config))[0])
+    # if args.work_dir is not None:
+    #     # update configs according to CLI args if args.work_dir is not None
+    #     cfg.work_dir = args.work_dir
+    # elif cfg.get('work_dir', None) is None:
+    #     # use config filename as default work_dir if cfg.work_dir is None
+    #     work_dirs = './work_dirs/' + current_time
+    #     cfg.work_dir = osp.join(work_dirs,
+    #                             osp.splitext(osp.basename(args.config))[0])
+        
+    current_time = "{0:%Y%m%d-%H%M%S}".format(datetime.datetime.now(tz=pytz.timezone("Asia/Chongqing")))
+    pre_path = '/mnt/intel/jupyterhub/swc/train_log/mm3d'
+    cfg.work_dir = osp.join(pre_path, osp.splitext(osp.basename(args.config))[0], current_time)
     if args.resume_from is not None:
         cfg.resume_from = args.resume_from
 

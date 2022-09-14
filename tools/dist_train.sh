@@ -17,5 +17,4 @@ python -m torch.distributed.launch \
     $(dirname "$0")/train.py \
     $CONFIG \
     --seed 0 \
-    --resume-from './work_dirs/2022-08-25T14-41-26/hv_pointpillars_secfpn_6x4_160e_plus-kitti-3d-4class/epoch_29.pth' \
     --launcher pytorch ${@:3}
