@@ -2,6 +2,8 @@
 import mmcv
 import numpy as np
 
+import os.path as osp
+
 from mmdet3d.core.points import BasePoints, get_points_type
 from mmdet.datasets.pipelines import LoadAnnotations, LoadImageFromFile
 from ..builder import PIPELINES

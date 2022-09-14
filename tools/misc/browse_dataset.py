@@ -11,7 +11,7 @@ from mmcv import Config, DictAction, mkdir_or_exist
 from mmdet3d.core.bbox import (Box3DMode, CameraInstance3DBoxes, Coord3DMode,
                                DepthInstance3DBoxes, LiDARInstance3DBoxes)
 from mmdet3d.core.visualizer import (show_multi_modality_result, show_result,
-                                     show_seg_result)
+                                     show_seg_result, show_multi_cams_modality_result)
 from mmdet3d.datasets import build_dataset
 
 
@@ -32,7 +32,7 @@ def parse_args():
     parser.add_argument(
         '--task',
         type=str,
-        choices=['det', 'seg', 'multi_modality-det', 'mono-det'],
+        choices=['det', 'seg', 'multi_modality-det', 'mono-det', 'plus-det'],
         help='Determine the visualization method depending on the task.')
     parser.add_argument(
         '--aug',
@@ -42,17 +42,17 @@ def parse_args():
         '--online',
         action='store_true',
         help='Whether to perform online visualization. Note that you often '
-        'need a monitor to do so.')
+             'need a monitor to do so.')
     parser.add_argument(
         '--cfg-options',
         nargs='+',
         action=DictAction,
         help='override some settings in the used config, the key-value pair '
-        'in xxx=yyy format will be merged into config file. If the value to '
-        'be overwritten is a list, it should be like key="[a,b]" or key=a,b '
-        'It also allows nested list/tuple values, e.g. key="[(a,b),(c,d)]" '
-        'Note that the quotation marks are necessary and that no white space '
-        'is allowed.')
+             'in xxx=yyy format will be merged into config file. If the value to '
+             'be overwritten is a list, it should be like key="[a,b]" or key=a,b '
+             'It also allows nested list/tuple values, e.g. key="[(a,b),(c,d)]" '
+             'Note that the quotation marks are necessary and that no white space '
+             'is allowed.')
     args = parser.parse_args()
     return args
 
@@ -109,8 +109,8 @@ def show_det_data(input, out_dir, show=False):
     img_metas = input['img_metas']._data
     points = input['points']._data.numpy()
     gt_bboxes = input['gt_bboxes_3d']._data.tensor
-    if img_metas['box_mode_3d'] != Box3DMode.DEPTH:
-        points, gt_bboxes = to_depth_mode(points, gt_bboxes)
+    # if img_metas['box_mode_3d'] != Box3DMode.DEPTH:
+    #     points, gt_bboxes = to_depth_mode(points, gt_bboxes)
     filename = osp.splitext(osp.basename(img_metas['pts_filename']))[0]
     show_result(
         points,
@@ -192,6 +192,33 @@ def show_proj_bbox_img(input, out_dir, show=False, is_nus_mono=False):
             img, None, None, None, out_dir, filename, show=show)
 
 
+def show_proj_bbox_mutlicam(input, out_dir, show=False):
+    """Visualize 3D bboxes on 2D image by projection."""
+    gt_bboxes = input['gt_bboxes_3d'].data
+    img_metas = input['img_metas'].data
+
+    img_list = []
+    Tr_list = []
+    filename_list = []
+    for img, tr, filename in zip(input['img'], img_metas['lidar2img'], img_metas['filename']):
+        this_img = img.data.numpy()
+        this_img = this_img.transpose(1, 2, 0)
+        this_filename = Path(filename).name
+
+        img_list.append(this_img)
+        Tr_list.append(tr)
+        filename_list.append(this_filename)
+
+    show_multi_cams_modality_result(img_list,
+                                    gt_bboxes,
+                                    None,
+                                    Tr_list,
+                                    out_dir,
+                                    filename_list,
+                                    img_metas=img_metas,
+                                    show=show)
+
+
 def main():
     args = parse_args()
 
@@ -212,7 +239,7 @@ def main():
     progress_bar = mmcv.ProgressBar(len(dataset))
 
     for input in dataset:
-        if vis_task in ['det', 'multi_modality-det']:
+        if vis_task in ['det', 'multi_modality-det', 'plus-det']:
             # show 3D bboxes on 3D point clouds
             show_det_data(input, args.output_dir, show=args.online)
         if vis_task in ['multi_modality-det', 'mono-det']:
@@ -225,6 +252,11 @@ def main():
         elif vis_task in ['seg']:
             # show 3D segmentation mask on 3D point clouds
             show_seg_data(input, args.output_dir, show=args.online)
+        elif vis_task in ['plus-det']:
+            show_proj_bbox_mutlicam(
+                input,
+                args.output_dir,
+                show=args.online)
         progress_bar.update()
 
 

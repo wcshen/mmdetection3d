@@ -289,3 +289,59 @@ def show_multi_modality_result(img,
         pred_img = draw_bbox(
             pred_bboxes, img, proj_mat, img_metas, color=pred_bbox_color)
         mmcv.imwrite(pred_img, osp.join(result_path, f'{filename}_pred.png'))
+
+
+def show_multi_cams_modality_result(img,
+                                    gt_bboxes,
+                                    pred_bboxes,
+                                    proj_mat,
+                                    out_dir,
+                                    filename,
+                                    img_metas=None,
+                                    show=False,
+                                    gt_bbox_color=(61, 102, 255),
+                                    pred_bbox_color=(241, 101, 72)):
+    import cv2
+    draw_bbox = draw_lidar_bbox3d_on_img
+    cam_nums = len(filename)
+    camera_names = ['front_left_camera', 'front_right_camera',
+                    'side_left_camera', 'side_right_camera',
+                    'rear_left_camera', 'rear_right_camera']
+    for idx in range(cam_nums):
+        this_img = img[idx]
+        this_mat = proj_mat[idx]
+        this_filename = filename[idx]
+        camera_name = camera_names[idx]
+
+        result_path = osp.join(out_dir, this_filename)
+        mmcv.mkdir_or_exist(result_path)
+
+        if show:
+            show_img = this_img.copy()
+            if gt_bboxes is not None:
+                # TODO(swc): box next [done]
+                show_img = draw_bbox(
+                    gt_bboxes, show_img, this_mat, img_metas, color=gt_bbox_color)
+            if pred_bboxes is not None:
+                show_img = draw_bbox(
+                    pred_bboxes,
+                    show_img,
+                    this_mat,
+                    img_metas,
+                    color=pred_bbox_color)
+            cv2.putText(show_img, f"{camera_name}", (15, 40), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                        fontScale=1.0, color=(0, 0, 255), thickness=2)
+            mmcv.imshow(show_img, win_name='project_bbox3d_img', wait_time=0)
+
+        if this_img is not None:
+            mmcv.imwrite(this_img, osp.join(result_path, f'{this_filename}_img.png'))
+
+        if gt_bboxes is not None:
+            gt_img = draw_bbox(
+                gt_bboxes, this_img, this_mat, img_metas, color=gt_bbox_color)
+            mmcv.imwrite(gt_img, osp.join(result_path, f'{this_filename}_gt.png'))
+
+        if pred_bboxes is not None:
+            pred_img = draw_bbox(
+                pred_bboxes, this_img, this_mat, img_metas, color=pred_bbox_color)
+            mmcv.imwrite(pred_img, osp.join(result_path, f'{this_filename}_pred.png'))
