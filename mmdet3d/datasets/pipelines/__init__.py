@@ -17,6 +17,8 @@ from .transforms_3d import (AffineResize, BackgroundPointsFilter,
                             RandomDropPointsColor, RandomFlip3D,
                             RandomJitterPoints, RandomRotate, RandomShiftScale,
                             RangeLimitedRandomCrop, VoxelBasedPointSampler)
+from .paint_point import PaintPointsWithImageFeature
+from .custom_transform import RandomFlipLidarOnly
 
 __all__ = [
     'ObjectSample', 'RandomFlip3D', 'ObjectNoise', 'GlobalRotScaleTrans',
@@ -30,5 +32,6 @@ __all__ = [
     'LoadImageFromFileMono3D', 'ObjectNameFilter', 'RandomDropPointsColor',
     'RandomJitterPoints', 'AffineResize', 'RandomShiftScale',
     'LoadPointsFromDict', 'MultiViewWrapper', 'RandomRotate',
-    'RangeLimitedRandomCrop', 'DefaultFormatBundleMultiCam3D', 'LoadMultiCamImagesFromFile'
+    'RangeLimitedRandomCrop', 'DefaultFormatBundleMultiCam3D', 'LoadMultiCamImagesFromFile',
+    'PaintPointsWithImageFeature', 'RandomFlipLidarOnly'
 ]

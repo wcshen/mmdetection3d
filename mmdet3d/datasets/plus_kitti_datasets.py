@@ -76,7 +76,7 @@ class PlusKittiDataset(KittiDataset):
             test_mode=test_mode,
             pcd_limit_range=pcd_limit_range,
             **kwargs)
-        # NOTE(swc): data_infos is read in the custom_3d.py->Custom3DDataset __init__ function
+        # data_infos is read in the custom_3d.py->Custom3DDataset __init__ function
         # through load_annotations()
 
         # to load a subset, just set the load_interval in the dataset config
@@ -547,8 +547,7 @@ class PlusKittiDataset(KittiDataset):
                 ap_result_str, ap_dict = kitti_eval(gt_annos, result_files,  # NOTE(swc): kitti_eval entry
                                                     self.CLASSES, eval_types=['bev', '3d']) # add eval type 
                 
-                result_str, result_difficulty = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, det_pcdet, 0, 0,
-                 '/home/rongbo.ma/mmdetection3d/debug', False)
+                result_str, result_difficulty = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, det_pcdet, 0, 0, eval_result_dir, False)
                 
                 print_log('\n' + '****************pcdet eval start.*****************', logger=logger)
                 print_log('\n' + result_str, logger=logger)

@@ -8,7 +8,7 @@ import numba
 import numpy as np
 import math
 
-# from tensorboardX import SummaryWriter
+from tensorboardX import SummaryWriter
 from mmdet3d.core.evaluation.kitti_utils.eval import bev_box_overlap
 
 def print_str(value, *arg, sstream=None):
@@ -404,8 +404,6 @@ def get_eval_results(gt_annos, dt_annos, current_class, min_overlap, dist_thresh
     }
 
     return ret_dict
-
-
 
 
 def get_formatted_results(bev_range,

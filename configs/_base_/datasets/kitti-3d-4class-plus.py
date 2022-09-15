@@ -1,6 +1,6 @@
 # dataset settings
 dataset_type = 'PlusKittiDataset'
-data_root = 'data/L4E_origin_data/'
+data_root = '/mnt/intel/jupyterhub/swc/datasets/pc_label_trainval/CN_L4_origin_data/'
 class_names = ['Pedestrian', 'Cyclist', 'Car', 'Truck']
 point_cloud_range = [0, -10.0, -2.0, 150.0, 10.0, 6.0]
 input_modality = dict(use_lidar=True, use_camera=True)
@@ -65,7 +65,7 @@ train_pipeline = [
     dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='PointShuffle'),
     dict(type='DefaultFormatBundleMultiCam3D', class_names=class_names),
-    dict(type='Collect3D', keys=['imgs', 'points', 'gt_bboxes_3d', 'gt_labels_3d'])
+    dict(type='Collect3D', keys=['img', 'points', 'gt_bboxes_3d', 'gt_labels_3d'])
 ]
 test_pipeline = [
     dict(
@@ -116,7 +116,7 @@ eval_pipeline = [
 ]
 
 data = dict(
-    samples_per_gpu=8,
+    samples_per_gpu=4,
     workers_per_gpu=4,
     train=dict(
         type='RepeatDataset',
