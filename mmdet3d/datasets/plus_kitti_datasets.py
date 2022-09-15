@@ -2,6 +2,8 @@ import copy
 import os
 import tempfile
 from os import path as osp
+from tkinter.messagebox import NO
+from unittest.mock import NonCallableMagicMock
 
 import mmcv
 import numpy as np
@@ -16,7 +18,7 @@ from .custom_3d import Custom3DDataset
 from .pipelines import Compose
 
 from .kitti_dataset import KittiDataset
-
+from tensorboardX import SummaryWriter
 
 @DATASETS.register_module()
 class PlusKittiDataset(KittiDataset):
@@ -87,6 +89,8 @@ class PlusKittiDataset(KittiDataset):
         self.camera_names = ['front_left_camera', 'front_right_camera',
                              'side_left_camera', 'side_right_camera',
                              'rear_left_camera', 'rear_right_camera']
+        self.epoch_cnt = 0
+        self.eval_tb = None
 
     def load_annotations(self, ann_file):
         data = mmcv.load(ann_file, file_format='pkl')
@@ -508,6 +512,9 @@ class PlusKittiDataset(KittiDataset):
         Returns:
             dict[str, float]: Results of each evaluation metric.
         """
+        self.epoch_cnt += 2
+        if self.eval_tb is None:
+            self.eval_tb = SummaryWriter(log_dir=str(eval_result_dir / 'tensorboard'))
         result_files, tmp_dir = self.format_results(results, pklfile_prefix)  # result_files: a list of all annos of each frame
         from mmdet3d.core.evaluation import kitti_eval
         gt_annos = [self.anno_lidar2cam(info['annos'], info['calib']) for info in self.data_infos]
@@ -547,7 +554,7 @@ class PlusKittiDataset(KittiDataset):
                 ap_result_str, ap_dict = kitti_eval(gt_annos, result_files,  # NOTE(swc): kitti_eval entry
                                                     self.CLASSES, eval_types=['bev', '3d']) # add eval type 
                 
-                result_str, result_difficulty = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, det_pcdet, 0, 0, eval_result_dir, False)
+                result_str, result_difficulty = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, det_pcdet, self.epoch_cnt, eval_result_dir, tb_log=self.eval_tb)
                 
                 print_log('\n' + '****************pcdet eval start.*****************', logger=logger)
                 print_log('\n' + result_str, logger=logger)

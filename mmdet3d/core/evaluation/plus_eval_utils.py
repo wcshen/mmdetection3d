@@ -410,19 +410,12 @@ def get_formatted_results(bev_range,
                           class_names,
                           gt_annos,
                           det_annos,
-                          avg_epoch_loss,
                           epoch_id,
                           result_dir,
-                          use_tensorboard):
+                          tb_log=None):
     # Initialize evaluation metrics
     min_overlaps = {'Car': 0.5, 'Truck': 0.5, 'Pedestrian': 0.3, 'Cyclist': 0.3}
     dist_thresholds = list(range(50, math.ceil(bev_range[3]) + 50, 50)) if bev_range[3] > 50 else [50] # Range from 50m to max detection range, step by 50
-
-    # Get the formated evaluation results
-    if use_tensorboard:
-        tb_log = SummaryWriter(log_dir=str(result_dir / 'tensorboard'))
-        tb_log.add_scalar('loss/avg_epoch_loss', avg_epoch_loss, epoch_id)
-
     result_str = print_str("\n================== Evaluation Results ==================")
     result_difficulty = []
     for cls in class_names:
@@ -445,7 +438,7 @@ def get_formatted_results(bev_range,
         # Report the evaluation results to TensorBoard
         # Here we only report the metrics of max distance threshold to indicate the overall performance,
         # which is easier to track the model performance in TensorBoard
-        if use_tensorboard:
+        if tb_log is not None:
             tb_log.add_scalar(str(cls) + '/average precision',eval_res[-1, 0], epoch_id)
             tb_log.add_scalar(str(cls) + '/precision', eval_res[-1, 1], epoch_id)
             tb_log.add_scalar(str(cls) + '/recall', eval_res[-1, 2], epoch_id)
