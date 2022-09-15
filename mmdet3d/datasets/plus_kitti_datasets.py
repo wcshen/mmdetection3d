@@ -514,7 +514,7 @@ class PlusKittiDataset(KittiDataset):
         """
         self.epoch_cnt += 2
         if self.eval_tb is None:
-            self.eval_tb = SummaryWriter(log_dir=str(eval_result_dir / 'tensorboard'))
+            self.eval_tb = SummaryWriter(log_dir=eval_result_dir + '/tensorboard')
         result_files, tmp_dir = self.format_results(results, pklfile_prefix)  # result_files: a list of all annos of each frame
         from mmdet3d.core.evaluation import kitti_eval
         gt_annos = [self.anno_lidar2cam(info['annos'], info['calib']) for info in self.data_infos]
@@ -562,7 +562,7 @@ class PlusKittiDataset(KittiDataset):
 
             print_log('\n' + ap_result_str, logger=logger)
         if eval_result_dir is not None:
-            with open(os.path.join(eval_result_dir, 'human_readable_results' + '.txt'), 'w') as f:
+            with open(os.path.join(eval_result_dir, f'human_readable_results_{self.epoch_cnt}.txt'), 'w') as f:
                 f.write(result_str)
         if tmp_dir is not None:
             tmp_dir.cleanup()
