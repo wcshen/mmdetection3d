@@ -89,8 +89,6 @@ class PlusKittiDataset(KittiDataset):
         self.camera_names = ['front_left_camera', 'front_right_camera',
                              'side_left_camera', 'side_right_camera',
                              'rear_left_camera', 'rear_right_camera']
-        self.epoch_cnt = 0
-        self.eval_tb = None
 
     def load_annotations(self, ann_file):
         data = mmcv.load(ann_file, file_format='pkl')
@@ -512,12 +510,6 @@ class PlusKittiDataset(KittiDataset):
         Returns:
             dict[str, float]: Results of each evaluation metric.
         """
-        self.epoch_cnt += 2
-        if self.eval_tb is None:
-            self.eval_tb = SummaryWriter(log_dir=eval_result_dir + '/tensorboard')
-        result_files, tmp_dir = self.format_results(results, pklfile_prefix)  # result_files: a list of all annos of each frame
-        from mmdet3d.core.evaluation import kitti_eval
-        gt_annos = [self.anno_lidar2cam(info['annos'], info['calib']) for info in self.data_infos]
         
         # to pcdet format
         from mmdet3d.core.evaluation import get_formatted_results
@@ -529,47 +521,18 @@ class PlusKittiDataset(KittiDataset):
             gt_anno = {'gt_boxes': gt_boxes, 'name': gt_names}
             gt_annos_pcdet.append(gt_anno)
 
-        if isinstance(result_files, dict):
-            ap_dict = dict()
-            for name, result_files_ in result_files.items():
-                eval_types = ['bbox', 'bev', '3d']
-                if 'img' in name:
-                    eval_types = ['bbox']
-                ap_result_str, ap_dict_ = kitti_eval(
-                    gt_annos,
-                    result_files_,
-                    self.CLASSES,
-                    eval_types=eval_types)
-                for ap_type, ap in ap_dict_.items():
-                    ap_dict[f'{name}/{ap_type}'] = float('{:.4f}'.format(ap))
+        result_str, result_dict = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, det_pcdet, eval_result_dir)
+        
+        print_log('\n' + '****************pcdet eval start.*****************', logger=logger)
+        print_log('\n' + result_str, logger=logger)
+        print_log('\n' + '****************pcdet eval done.*****************', logger=logger)
 
-                print_log(
-                    f'Results of {name}:\n' + ap_result_str, logger=logger)
-
-        else:
-            if metric == 'img_bbox':
-                ap_result_str, ap_dict = kitti_eval(
-                    gt_annos, result_files, self.CLASSES, eval_types=['bbox'])
-            else:
-                ap_result_str, ap_dict = kitti_eval(gt_annos, result_files,  # NOTE(swc): kitti_eval entry
-                                                    self.CLASSES, eval_types=['bev', '3d']) # add eval type 
-                
-                result_str, result_difficulty = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, det_pcdet, self.epoch_cnt, eval_result_dir, tb_log=self.eval_tb)
-                
-                print_log('\n' + '****************pcdet eval start.*****************', logger=logger)
-                print_log('\n' + result_str, logger=logger)
-                print_log('\n' + '****************pcdet eval done.*****************', logger=logger)
-
-            print_log('\n' + ap_result_str, logger=logger)
         if eval_result_dir is not None:
             with open(os.path.join(eval_result_dir, f'human_readable_results_{self.epoch_cnt}.txt'), 'w') as f:
                 f.write(result_str)
-        if tmp_dir is not None:
-            tmp_dir.cleanup()
         if show or out_dir:
             self.show(results, out_dir, show=show, pipeline=pipeline)
-        return ap_dict
-    
+        return result_dict
     
     
     def show(self, results, out_dir, show=True, pipeline=None):

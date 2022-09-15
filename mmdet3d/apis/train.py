@@ -300,7 +300,7 @@ def train_detector(model,
             shuffle=False)
         eval_cfg = cfg.get('evaluation', {})
         eval_cfg['by_epoch'] = cfg.runner['type'] != 'IterBasedRunner'
-        eval_cfg['eval_result_dir'] = cfg.work_dir + '/val'
+        eval_cfg['eval_result_dir'] = cfg.work_dir + '/eval'
         eval_hook = MMDET_DistEvalHook if distributed else MMDET_EvalHook
         # In this PR (https://github.com/open-mmlab/mmcv/pull/1193), the
         # priority of IterTimerHook has been modified from 'NORMAL' to 'LOW'.

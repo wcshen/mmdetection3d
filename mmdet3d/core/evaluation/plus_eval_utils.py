@@ -410,14 +410,13 @@ def get_formatted_results(bev_range,
                           class_names,
                           gt_annos,
                           det_annos,
-                          epoch_id,
-                          result_dir,
-                          tb_log=None):
+                          result_dir):
     # Initialize evaluation metrics
     min_overlaps = {'Car': 0.5, 'Truck': 0.5, 'Pedestrian': 0.3, 'Cyclist': 0.3}
     dist_thresholds = list(range(50, math.ceil(bev_range[3]) + 50, 50)) if bev_range[3] > 50 else [50] # Range from 50m to max detection range, step by 50
     result_str = print_str("\n================== Evaluation Results ==================")
     result_difficulty = []
+    result_dict = {}
     for cls in class_names:
         result_str += print_str(cls.upper(), "\t", ("{:.1f}m\t" * len(dist_thresholds)).format(*dist_thresholds))
         eval_res = []
@@ -438,11 +437,10 @@ def get_formatted_results(bev_range,
         # Report the evaluation results to TensorBoard
         # Here we only report the metrics of max distance threshold to indicate the overall performance,
         # which is easier to track the model performance in TensorBoard
-        if tb_log is not None:
-            tb_log.add_scalar(str(cls) + '/average precision',eval_res[-1, 0], epoch_id)
-            tb_log.add_scalar(str(cls) + '/precision', eval_res[-1, 1], epoch_id)
-            tb_log.add_scalar(str(cls) + '/recall', eval_res[-1, 2], epoch_id)
-            tb_log.add_scalar(str(cls) + '/score threshold', eval_res[-1, 3], epoch_id)
+        result_dict[str(cls) + '/average precision'] = eval_res[-1, 0]
+        result_dict[str(cls) + '/precision'] = eval_res[-1, 1]
+        result_dict[str(cls) + '/recall'] = eval_res[-1, 2]
+        result_dict[str(cls) + '/score threshold'] = eval_res[-1, 3]
 
         # Convert the results to formated string
         result_str += print_str("ap:\t", ("{:.2f}\t" * len(dist_thresholds)).format(*(eval_res[:, 0].tolist())))
@@ -456,5 +454,5 @@ def get_formatted_results(bev_range,
                               "'re' stands for recall at recommended score threhold;\n"
                               "'th' stands for recommended score threshold that achieves optimal balance between precision and recall.")
 
-    return result_str, result_difficulty
+    return result_str, result_dict
 
