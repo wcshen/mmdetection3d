@@ -410,8 +410,10 @@ def get_formatted_results(bev_range,
                           class_names,
                           gt_annos,
                           det_annos,
-                          result_dir):
+                          result_dir,
+                          eval_cnt):
     # Initialize evaluation metrics
+    os.makedirs(result_dir, exist_ok=True)
     min_overlaps = {'Car': 0.5, 'Truck': 0.5, 'Pedestrian': 0.3, 'Cyclist': 0.3}
     dist_thresholds = list(range(50, math.ceil(bev_range[3]) + 50, 50)) if bev_range[3] > 50 else [50] # Range from 50m to max detection range, step by 50
     result_str = print_str("\n================== Evaluation Results ==================")
@@ -429,7 +431,7 @@ def get_formatted_results(bev_range,
                              res['best_score_threshold']])
             
             # generate t-p-r table
-            with open(str(result_dir)+'/tpr.%s_%d'%(cls, dist_thres), 'w') as f:
+            with open(str(result_dir)+'/tpr.%s_%d_%d'%(cls, dist_thres, eval_cnt), 'w') as f:
                 for t,p,r in zip(res['thresholds'], res['precision'], res['recall']):
                     print("%.3f,%.3f,%.3f"%(t, p, r), file = f)        
         eval_res = np.array(eval_res)
