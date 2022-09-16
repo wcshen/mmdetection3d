@@ -412,21 +412,16 @@ def get_formatted_results(bev_range,
                           class_names,
                           gt_annos,
                           det_annos,
-                          avg_epoch_loss,
-                          epoch_id,
                           result_dir,
-                          use_tensorboard):
+                          eval_cnt):
     # Initialize evaluation metrics
+    os.makedirs(result_dir, exist_ok=True)
     min_overlaps = {'Car': 0.5, 'Truck': 0.5, 'Pedestrian': 0.3, 'Cyclist': 0.3}
     dist_thresholds = list(range(50, math.ceil(bev_range[3]) + 50, 50)) if bev_range[3] > 50 else [50] # Range from 50m to max detection range, step by 50
 
-    # Get the formated evaluation results
-    if use_tensorboard:
-        tb_log = SummaryWriter(log_dir=str(result_dir / 'tensorboard'))
-        tb_log.add_scalar('loss/avg_epoch_loss', avg_epoch_loss, epoch_id)
-
     result_str = print_str("\n================== Evaluation Results ==================")
     result_difficulty = []
+    result_dict = {}
     for cls in class_names:
         result_str += print_str(cls.upper(), "\t", ("{:.1f}m\t" * len(dist_thresholds)).format(*dist_thresholds))
         eval_res = []
@@ -439,7 +434,7 @@ def get_formatted_results(bev_range,
                              res['best_score_threshold']])
             
             # generate t-p-r table
-            with open(str(result_dir)+'/tpr.%s_%d'%(cls, dist_thres), 'w') as f:
+            with open(str(result_dir)+'/tpr.%s_%d_%d'%(cls, dist_thres, eval_cnt), 'w') as f:
                 for t,p,r in zip(res['thresholds'], res['precision'], res['recall']):
                     print("%.3f,%.3f,%.3f"%(t, p, r), file = f)        
         eval_res = np.array(eval_res)
@@ -447,11 +442,10 @@ def get_formatted_results(bev_range,
         # Report the evaluation results to TensorBoard
         # Here we only report the metrics of max distance threshold to indicate the overall performance,
         # which is easier to track the model performance in TensorBoard
-        if use_tensorboard:
-            tb_log.add_scalar(str(cls) + '/average precision',eval_res[-1, 0], epoch_id)
-            tb_log.add_scalar(str(cls) + '/precision', eval_res[-1, 1], epoch_id)
-            tb_log.add_scalar(str(cls) + '/recall', eval_res[-1, 2], epoch_id)
-            tb_log.add_scalar(str(cls) + '/score threshold', eval_res[-1, 3], epoch_id)
+        result_dict[str(cls) + '/average precision'] = eval_res[-1, 0]
+        result_dict[str(cls) + '/precision'] = eval_res[-1, 1]
+        result_dict[str(cls) + '/recall'] = eval_res[-1, 2]
+        result_dict[str(cls) + '/score threshold'] = eval_res[-1, 3]
 
         # Convert the results to formated string
         result_str += print_str("ap:\t", ("{:.2f}\t" * len(dist_thresholds)).format(*(eval_res[:, 0].tolist())))
@@ -465,5 +459,5 @@ def get_formatted_results(bev_range,
                               "'re' stands for recall at recommended score threhold;\n"
                               "'th' stands for recommended score threshold that achieves optimal balance between precision and recall.")
 
-    return result_str, result_difficulty
+    return result_str, result_dict
 
