@@ -412,6 +412,7 @@ def get_formatted_results(bev_range,
                           det_annos,
                           result_dir):
     # Initialize evaluation metrics
+    os.makedirs(result_dir, exist_ok=True)
     min_overlaps = {'Car': 0.5, 'Truck': 0.5, 'Pedestrian': 0.3, 'Cyclist': 0.3}
     dist_thresholds = list(range(50, math.ceil(bev_range[3]) + 50, 50)) if bev_range[3] > 50 else [50] # Range from 50m to max detection range, step by 50
     result_str = print_str("\n================== Evaluation Results ==================")

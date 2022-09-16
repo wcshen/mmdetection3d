@@ -2,7 +2,7 @@
 dataset_type = 'PlusKittiDataset'
 data_root = '/mnt/intel/jupyterhub/swc/datasets/pc_label_trainval/CN_L4_origin_data/'
 class_names = ['Pedestrian', 'Cyclist', 'Car', 'Truck']
-point_cloud_range = [0, -10.0, -2.0, 150.0, 10.0, 6.0]
+point_cloud_range = [-50, -50, -2, 150, 50, 6]
 input_modality = dict(use_lidar=True, use_camera=True)
 
 file_client_args = dict(backend='disk')
@@ -116,11 +116,11 @@ eval_pipeline = [
 ]
 
 data = dict(
-    samples_per_gpu=6,
+    samples_per_gpu=4,
     workers_per_gpu=4,
     train=dict(
         type='RepeatDataset',
-        times=1,
+        times=2,
         dataset=dict(
             type=dataset_type,
             data_root=data_root,
