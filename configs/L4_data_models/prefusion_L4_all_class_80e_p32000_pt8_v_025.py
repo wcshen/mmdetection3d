@@ -219,7 +219,7 @@ eval_pipeline = [
 ]
 
 data = dict(
-    samples_per_gpu=4,
+    samples_per_gpu=8,
     workers_per_gpu=4,
     train=dict(
         type='RepeatDataset',
@@ -258,7 +258,7 @@ data = dict(
         ann_file=benchmark_root + 'Kitti_L4_data_mm3d_infos_val.pkl',
         split='training',
         pts_prefix='pointcloud',
-        samples_per_gpu=4,
+        samples_per_gpu=8,
         pipeline=test_pipeline,
         modality=input_modality,
         classes=class_names,

@@ -89,6 +89,7 @@ class PlusKittiDataset(KittiDataset):
         self.camera_names = ['front_left_camera', 'front_right_camera',
                              'side_left_camera', 'side_right_camera',
                              'rear_left_camera', 'rear_right_camera']
+        self.eval_cnt = 0
 
     def load_annotations(self, ann_file):
         data = mmcv.load(ann_file, file_format='pkl')
@@ -512,6 +513,7 @@ class PlusKittiDataset(KittiDataset):
         """
         
         # to pcdet format
+        self.eval_cnt+=1
         from mmdet3d.core.evaluation import get_formatted_results
         det_pcdet = self.bbox2result_pcdet(results, self.CLASSES, pklfile_prefix)
         gt_annos_pcdet = []
@@ -521,14 +523,14 @@ class PlusKittiDataset(KittiDataset):
             gt_anno = {'gt_boxes': gt_boxes, 'name': gt_names}
             gt_annos_pcdet.append(gt_anno)
 
-        result_str, result_dict = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, det_pcdet, eval_result_dir)
+        result_str, result_dict = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, det_pcdet, eval_result_dir, self.eval_cnt)
         
         print_log('\n' + '****************pcdet eval start.*****************', logger=logger)
         print_log('\n' + result_str, logger=logger)
         print_log('\n' + '****************pcdet eval done.*****************', logger=logger)
 
         if eval_result_dir is not None:
-            with open(os.path.join(eval_result_dir, f'human_readable_results_{self.epoch_cnt}.txt'), 'w') as f:
+            with open(os.path.join(eval_result_dir, f'human_readable_results_{self.eval_cnt}.txt'), 'w') as f:
                 f.write(result_str)
         if show or out_dir:
             self.show(results, out_dir, show=show, pipeline=pipeline)
