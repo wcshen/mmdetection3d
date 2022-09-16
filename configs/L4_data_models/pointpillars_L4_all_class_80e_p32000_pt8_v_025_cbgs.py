@@ -16,7 +16,7 @@ model = dict(
     ),
     voxel_encoder=dict(
         type='PillarFeatureNet',
-        in_channels=68,
+        in_channels=4,
         feat_channels=[64],
         with_distance=False,
         voxel_size=voxel_size,
@@ -113,10 +113,10 @@ model = dict(
 
 # dataset settings
 dataset_type = 'PlusKittiDataset'
-data_root = '/home/wancheng.shen/datasets/CN_L4_origin_data/'
-benchmark_root = '/home/wancheng.shen/datasets/CN_L4_origin_benchmark/'
+data_root = '/mnt/intel/jupyterhub/swc/datasets/pc_label_trainval/CN_L4_origin_data/'
+benchmark_root = '/mnt/intel/jupyterhub/swc/datasets/pc_label_trainval/CN_L4_origin_benchmark/'
 class_names = ['Pedestrian', 'Cyclist', 'Car', 'Truck']
-input_modality = dict(use_lidar=True, use_camera=True)
+input_modality = dict(use_lidar=True, use_camera=False)
 
 file_client_args = dict(backend='disk')
 
@@ -153,9 +153,7 @@ train_pipeline = [
         with_label_3d=True,
         file_client_args=file_client_args),
     # dict(type='ObjectSample', db_sampler=db_sampler, use_ground_plane=True),
-    dict(type='LoadMultiCamImagesFromFile'),
-    dict(type='PaintPointsWithImageFeature', used_cameras=4),
-    dict(type='RandomFlipLidarOnly', flip_ratio_bev_horizontal=0.5),
+    dict(type='RandomFlip3D', flip_ratio_bev_horizontal=0.5),
     dict(
         type='GlobalRotScaleTrans',
         rot_range=[-0.78539816, 0.78539816],
@@ -163,7 +161,7 @@ train_pipeline = [
     dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='PointShuffle'),
-    dict(type='DefaultFormatBundleMultiCam3D', class_names=class_names),
+    dict(type='DefaultFormatBundle3D', class_names=class_names),
     dict(type='Collect3D', keys=['points', 'gt_bboxes_3d', 'gt_labels_3d'])
 ]
 
@@ -174,10 +172,7 @@ test_pipeline = [
         load_dim=4,
         use_dim=4,
         file_client_args=file_client_args,
-        point_type='float64'),
-    dict(type='LoadMultiCamImagesFromFile'),
-    dict(type='PaintPointsWithImageFeature', used_cameras=4),
-    
+        point_type='float64'),    
     dict(
         type='MultiScaleFlipAug3D',
         img_scale=(1333, 800),
@@ -189,11 +184,11 @@ test_pipeline = [
                 rot_range=[0, 0],
                 scale_ratio_range=[1., 1.],
                 translation_std=[0, 0, 0]),
-            dict(type='RandomFlipLidarOnly'),
+            dict(type='RandomFlip3D'),
             dict(
                 type='PointsRangeFilter', point_cloud_range=point_cloud_range),
             dict(
-                type='DefaultFormatBundleMultiCam3D',
+                type='DefaultFormatBundle3D',
                 class_names=class_names,
                 with_label=False),
             dict(type='Collect3D', keys=['points'])
@@ -209,10 +204,8 @@ eval_pipeline = [
         use_dim=4,
         point_type='float64',
         file_client_args=file_client_args),
-    dict(type='LoadMultiCamImagesFromFile'),
-    dict(type='PaintPointsWithImageFeature', used_cameras=4),
     dict(
-        type='DefaultFormatBundleMultiCam3D',
+        type='DefaultFormatBundle3D',
         class_names=class_names,
         with_label=False),
     dict(type='Collect3D', keys=['points'])
@@ -222,8 +215,7 @@ data = dict(
     samples_per_gpu=4,
     workers_per_gpu=8,
     train=dict(
-        type='RepeatDataset',
-        times=2,
+        type='CBGSDataset',
         dataset=dict(
             type=dataset_type,
             data_root=data_root,
