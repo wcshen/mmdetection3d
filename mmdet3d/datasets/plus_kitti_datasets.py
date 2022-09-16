@@ -1,7 +1,11 @@
 import copy
+from json import detect_encoding
 import os
 import tempfile
 from os import path as osp
+
+from tkinter.messagebox import NO
+import cv2
 
 import mmcv
 import numpy as np
@@ -87,6 +91,7 @@ class PlusKittiDataset(KittiDataset):
         self.camera_names = ['front_left_camera', 'front_right_camera',
                              'side_left_camera', 'side_right_camera',
                              'rear_left_camera', 'rear_right_camera']
+        self.eval_cnt = 0
 
     def load_annotations(self, ann_file):
         data = mmcv.load(ann_file, file_format='pkl')
@@ -483,7 +488,8 @@ class PlusKittiDataset(KittiDataset):
                  show=False,
                  out_dir=None,
                  pipeline=None,
-                 eval_result_dir=None):
+                 eval_result_dir=None,
+                 eval_file_tail=None):
         """Evaluation in KITTI protocol.
 
         Args:
@@ -511,8 +517,12 @@ class PlusKittiDataset(KittiDataset):
         result_files, tmp_dir = self.format_results(results, pklfile_prefix)  # result_files: a list of all annos of each frame
         from mmdet3d.core.evaluation import kitti_eval
         gt_annos = [self.anno_lidar2cam(info['annos'], info['calib']) for info in self.data_infos]
-        
         # to pcdet format
+        self.eval_cnt+=1
+        if eval_file_tail:
+            eval_cnt = eval_file_tail
+        else:
+            eval_cnt = self.eval_cnt
         from mmdet3d.core.evaluation import get_formatted_results
         det_pcdet = self.bbox2result_pcdet(results, self.CLASSES, pklfile_prefix)
         gt_annos_pcdet = []
@@ -521,7 +531,7 @@ class PlusKittiDataset(KittiDataset):
             gt_names = info['annos']['name'] 
             gt_anno = {'gt_boxes': gt_boxes, 'name': gt_names}
             gt_annos_pcdet.append(gt_anno)
-
+            
         if isinstance(result_files, dict):
             ap_dict = dict()
             for name, result_files_ in result_files.items():
@@ -536,34 +546,66 @@ class PlusKittiDataset(KittiDataset):
                 for ap_type, ap in ap_dict_.items():
                     ap_dict[f'{name}/{ap_type}'] = float('{:.4f}'.format(ap))
 
-                print_log(
-                    f'Results of {name}:\n' + ap_result_str, logger=logger)
-
+                # print_log(
+                #     f'Results of {name}:\n' + ap_result_str, logger=logger)
         else:
             if metric == 'img_bbox':
                 ap_result_str, ap_dict = kitti_eval(
                     gt_annos, result_files, self.CLASSES, eval_types=['bbox'])
             else:
-                ap_result_str, ap_dict = kitti_eval(gt_annos, result_files,  # NOTE(swc): kitti_eval entry
+                ap_result_str, ap_dict = kitti_eval(gt_annos, result_files,  # kitti_eval entry
                                                     self.CLASSES, eval_types=['bev', '3d']) # add eval type 
-                
-                result_str, result_difficulty = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, det_pcdet, 0, 0,
-                 '/home/rongbo.ma/mmdetection3d/debug', False)
-                
-                print_log('\n' + '****************pcdet eval start.*****************', logger=logger)
-                print_log('\n' + result_str, logger=logger)
-                print_log('\n' + '****************pcdet eval done.*****************', logger=logger)
+            # print_log('\n' + ap_result_str, logger=logger)
 
-            print_log('\n' + ap_result_str, logger=logger)
+        result_str, result_dict = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, det_pcdet, eval_result_dir, eval_cnt)
+        
+        print_log('\n' + '****************pcdet eval start.*****************', logger=logger)
+        print_log('\n' + result_str, logger=logger)
+        print_log('\n' + '****************pcdet eval done.*****************', logger=logger)
+
+        eval_file_name = f'human_readable_results_{eval_cnt}.txt'
+        
         if eval_result_dir is not None:
-            with open(os.path.join(eval_result_dir, 'human_readable_results' + '.txt'), 'w') as f:
+            with open(os.path.join(eval_result_dir, eval_file_name), 'w') as f:
                 f.write(result_str)
-        if tmp_dir is not None:
-            tmp_dir.cleanup()
-        if show or out_dir:
-            self.show(results, out_dir, show=show, pipeline=pipeline)
-        return ap_dict
+        if show:
+            self.save_eval_results(det_pcdet, out_dir)
+        return result_dict
     
+    @staticmethod
+    def concate_img(img0, img1):
+        h0,w0=img0.shape[0],img0.shape[1]  #cv2 读取出来的是h,w,c
+        h1,w1=img1.shape[0],img1.shape[1]
+        h=max(h0,h1)
+        w=max(w0,w1)
+        org_image=np.ones((h,w,3),dtype=np.uint8)*255
+        trans_image=np.ones((h,w,3),dtype=np.uint8)*255
+
+        org_image[:h0,:w0,:]=img0[:,:,:]
+        trans_image[:h1,:w1,:]=img1[:,:,:]
+        all_image = np.hstack((org_image[:,:w0,:], trans_image[:,:w1,:]))
+        return all_image
+    
+    def save_eval_results(self, dets_pcdet, results_dir):
+        from .utils import plot_gt_det_cmp
+        
+        for i, result in enumerate(dets_pcdet):
+            data_info = self.data_infos[i]
+            pts_path = data_info['point_cloud']['lidar_idx']
+            file_name = f"{self.root_split}/{self.pts_prefix}/{pts_path}.bin"
+            points = np.fromfile(file_name).reshape(-1, 4)
+            
+            img_path = data_info['image']['front_left_camera']['image_path'].replace('front_left_camera', 'front_left_camera_detect').replace('.jpg', '_detect.jpg')
+            detect_img = f"{self.root_split}/{img_path}"
+            print(detect_img)
+            detect_img = cv2.imread(detect_img)
+            pred_bboxes = result['dt_boxes']
+            scores = result['scores']
+            names = result['name']
+            path=str(results_dir / ("%s.jpg" % (pts_path)))
+            bev_img = plot_gt_det_cmp(points, [], pred_bboxes, self.pcd_limit_range, path=None, scores=scores, names=names)
+            all_image = self.concate_img(detect_img, bev_img)
+            cv2.imwrite(path, all_image)
     
     
     def show(self, results, out_dir, show=True, pipeline=None):
