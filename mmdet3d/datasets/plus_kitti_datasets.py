@@ -87,7 +87,7 @@ class PlusKittiDataset(KittiDataset):
         self.camera_names = ['front_left_camera', 'front_right_camera',
                              'side_left_camera', 'side_right_camera',
                              'rear_left_camera', 'rear_right_camera']
-
+        self.camera_names = ['front_left_camera', 'front_right_camera']
     def load_annotations(self, ann_file):
         data = mmcv.load(ann_file, file_format='pkl')
         data_infos = list(sorted(data, key=lambda e: int(e['point_cloud']['lidar_idx'].split('.')[0])))
