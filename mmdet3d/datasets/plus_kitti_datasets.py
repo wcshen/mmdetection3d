@@ -443,10 +443,11 @@ class PlusKittiDataset(KittiDataset):
                     'name': [],
                     'scores': []
             }
-            if len(pred_dicts['boxes_3d']) > 0:
-                scores = pred_dicts['scores_3d']
-                box_preds_lidar = pred_dicts['boxes_3d']
-                label_preds = pred_dicts['labels_3d']
+            if len(pred_dicts['pts_bbox']['boxes_3d']) > 0:
+                scores = pred_dicts['pts_bbox']['scores_3d']
+                box_preds_lidar = pred_dicts['pts_bbox']['boxes_3d']
+                label_preds = pred_dicts['pts_bbox']['labels_3d']
+
 
                 for box_lidar, score, label in zip(
                         box_preds_lidar, scores, label_preds):
@@ -525,7 +526,7 @@ class PlusKittiDataset(KittiDataset):
         if isinstance(result_files, dict):
             ap_dict = dict()
             for name, result_files_ in result_files.items():
-                eval_types = ['bbox', 'bev', '3d']
+                eval_types = ['bev', '3d']
                 if 'img' in name:
                     eval_types = ['bbox']
                 ap_result_str, ap_dict_ = kitti_eval(
@@ -533,6 +534,13 @@ class PlusKittiDataset(KittiDataset):
                     result_files_,
                     self.CLASSES,
                     eval_types=eval_types)
+                
+                result_str, result_difficulty = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, result_files_, 0, 0,
+                '/home/rongbo.ma/mmdetection3d/debug', False)                
+                print_log('\n' + '****************pcdet eval start.*****************', logger=logger)
+                print_log('\n' + result_str, logger=logger)
+                print_log('\n' + '****************pcdet eval done.*****************', logger=logger)
+
                 for ap_type, ap in ap_dict_.items():
                     ap_dict[f'{name}/{ap_type}'] = float('{:.4f}'.format(ap))
 
