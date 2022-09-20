@@ -113,13 +113,8 @@ model = dict(
 
 # dataset settings
 dataset_type = 'PlusKittiDataset'
-<<<<<<< HEAD
-data_root = '/mnt/intel/jupyterhub/swc/datasets/pc_label_trainval/CN_L4_origin_data/'
-benchmark_root = '/mnt/intel/jupyterhub/swc/datasets/pc_label_trainval/CN_L4_origin_benchmark/'
-=======
 data_root = '/home/wancheng.shen/datasets/CN_L4_origin_data/'
 benchmark_root = '/home/wancheng.shen/datasets/CN_L4_origin_benchmark/'
->>>>>>> cf0714369523bd089c3ee9cfe72204fd5accb24e
 class_names = ['Pedestrian', 'Cyclist', 'Car', 'Truck']
 input_modality = dict(use_lidar=True, use_camera=True)
 
@@ -227,8 +222,7 @@ data = dict(
     samples_per_gpu=4,
     workers_per_gpu=8,
     train=dict(
-        type='RepeatDataset',
-        times=2,
+        type='CBGSDataset',
         dataset=dict(
             type=dataset_type,
             data_root=data_root,
@@ -287,11 +281,6 @@ runner = dict(max_epochs=80)
 
 # Use evaluation interval=2 reduce the number of evaluation timese
 evaluation = dict(interval=10, pipeline=eval_pipeline)
-<<<<<<< HEAD
-workflow = [('train', 2), ('val', 1)]
-resume_from = '/mnt/intel/jupyterhub/swc/train_log/mm3d/prefusion_L4_all_class_80e_p32000_pt8_v_025/20220915-155132/epoch_43.pth'
-=======
 checkpoint_config = dict(interval=2)
 workflow = [('train', 2), ('val', 1)]
 # resume_from = '/mnt/intel/jupyterhub/swc/train_log/mm3d/prefusion_L4_all_class_80e_p32000_pt8_v_025/20220915-155132/epoch_43.pth'
->>>>>>> cf0714369523bd089c3ee9cfe72204fd5accb24e
