@@ -302,17 +302,12 @@ def calculate_iou_partly(gt_annos, dt_annos, num_parts=10):
     return overlaps, parted_overlaps, total_gt_num, total_dt_num
 
 
-def get_eval_results(gt_annos, dt_annos, current_class, min_overlap, dist_threshold):
+def get_eval_results(overlap_info, gt_annos, dt_annos, current_class, min_overlap, dist_threshold):
     N_SAMPLE_PTS = 41   # Defined by mAP calculation algorithm, better not change it
     precision = np.zeros((N_SAMPLE_PTS,))
     recall = np.zeros((N_SAMPLE_PTS,))
     frame_performance_stats = {}
-
-    assert len(gt_annos) == len(dt_annos)
-    num_examples = len(gt_annos)
-    split_parts = [1] * num_examples
-    overlaps, parted_overlaps, total_gt_num, total_dt_num = calculate_iou_partly(
-        gt_annos, dt_annos, num_parts=num_examples)
+    overlaps, split_parts, parted_overlaps, total_gt_num, total_dt_num = overlap_info
     rets = prepare_data(gt_annos, dt_annos, current_class, dist_threshold)
     (gt_datas_list, dt_datas_list, ignored_gts,
      ignored_dets, total_num_valid_gt) = rets
@@ -419,12 +414,19 @@ def get_formatted_results(bev_range,
     result_str = print_str("\n================== Evaluation Results ==================")
     result_difficulty = []
     result_dict = {}
+
+    assert len(gt_annos) == len(det_annos)
+    num_examples = len(gt_annos)
+    split_parts = [1] * num_examples
+    overlaps, parted_overlaps, total_gt_num, total_dt_num = calculate_iou_partly(
+        gt_annos, det_annos, num_parts=num_examples)
+    overlap_info = overlaps, split_parts, parted_overlaps, total_gt_num, total_dt_num
     for cls in class_names:
         result_str += print_str(cls.upper(), "\t", ("{:.1f}m\t" * len(dist_thresholds)).format(*dist_thresholds))
         eval_res = []
         min_overlap = min_overlaps[cls]
         for dist_thres in dist_thresholds:
-            res = get_eval_results(gt_annos, det_annos, cls.lower(), min_overlap, dist_thres)
+            res = get_eval_results(overlap_info, gt_annos, det_annos, cls.lower(), min_overlap, dist_thres)
             eval_res.append([res['avg_precision'],
                              res['optimal_precision'],
                              res['optimal_recall'],

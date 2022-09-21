@@ -16,7 +16,7 @@ model = dict(
     ),
     voxel_encoder=dict(
         type='PillarFeatureNet',
-        in_channels=68,
+        in_channels=4,
         feat_channels=[64],
         with_distance=False,
         voxel_size=voxel_size,
@@ -36,7 +36,7 @@ model = dict(
         out_channels=[128, 128, 128]),
     bbox_head=dict(
         type='Anchor3DHead',
-        num_classes=4,
+        num_classes=2,
         in_channels=384,
         feat_channels=384,
         use_direction_classifier=True,
@@ -44,14 +44,10 @@ model = dict(
         anchor_generator=dict(
             type='AlignedAnchor3DRangeGenerator',
             ranges=[
-                [-50, -50.0, -0.6, 150.0, 50.0, -0.6],  # FIXME(swc): z_range need to be confirmed
-                [-50, -50.0, -0.6, 150.0, 50.0, -0.6],
                 [-50, -50.0, -1.78, 150.0, 50.0, -1.78],
                 [-50, -50.0, -0.3, 150.0, 50.0, -0.3]
             ],
-            sizes=[[0.8, 0.6, 1.73], # ped
-                   [1.76, 0.6, 1.73], # cyclist
-                   [4.63, 1.97, 1.74], # car
+            sizes=[[4.63, 1.97, 1.74], # car
                    [12.5, 2.94, 3.47],  # truck
                    ],
             rotations=[0, 1.57],
@@ -70,20 +66,6 @@ model = dict(
     # model training and testing settings
     train_cfg=dict(
         assigner=[
-            dict(  # for Pedestrian
-                type='MaxIoUAssigner',
-                iou_calculator=dict(type='BboxOverlapsNearest3D'),
-                pos_iou_thr=0.5,
-                neg_iou_thr=0.35,
-                min_pos_iou=0.35,
-                ignore_iof_thr=-1),
-            dict(  # for Cyclist
-                type='MaxIoUAssigner',
-                iou_calculator=dict(type='BboxOverlapsNearest3D'),
-                pos_iou_thr=0.5,
-                neg_iou_thr=0.35,
-                min_pos_iou=0.35,
-                ignore_iof_thr=-1),
             dict(  # for Car
                 type='MaxIoUAssigner',
                 iou_calculator=dict(type='BboxOverlapsNearest3D'),
@@ -115,8 +97,8 @@ model = dict(
 dataset_type = 'PlusKittiDataset'
 data_root = '/home/wancheng.shen/datasets/CN_L4_origin_data/'
 benchmark_root = '/home/wancheng.shen/datasets/CN_L4_origin_benchmark/'
-class_names = ['Pedestrian', 'Cyclist', 'Car', 'Truck']
-input_modality = dict(use_lidar=True, use_camera=True)
+class_names = ['Car', 'Truck']
+input_modality = dict(use_lidar=True, use_camera=False)
 
 file_client_args = dict(backend='disk')
 
@@ -153,9 +135,7 @@ train_pipeline = [
         with_label_3d=True,
         file_client_args=file_client_args),
     # dict(type='ObjectSample', db_sampler=db_sampler, use_ground_plane=True),
-    dict(type='LoadMultiCamImagesFromFile'),
-    dict(type='PaintPointsWithImageFeature', used_cameras=4),
-    dict(type='RandomFlipLidarOnly', flip_ratio_bev_horizontal=0.5),
+    dict(type='RandomFlip3D', flip_ratio_bev_horizontal=0.5),
     dict(
         type='GlobalRotScaleTrans',
         rot_range=[-0.78539816, 0.78539816],
@@ -163,7 +143,7 @@ train_pipeline = [
     dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='PointShuffle'),
-    dict(type='DefaultFormatBundleMultiCam3D', class_names=class_names),
+    dict(type='DefaultFormatBundle3D', class_names=class_names),
     dict(type='Collect3D', keys=['points', 'gt_bboxes_3d', 'gt_labels_3d'])
 ]
 
@@ -174,10 +154,7 @@ test_pipeline = [
         load_dim=4,
         use_dim=4,
         file_client_args=file_client_args,
-        point_type='float64'),
-    dict(type='LoadMultiCamImagesFromFile'),
-    dict(type='PaintPointsWithImageFeature', used_cameras=4),
-    
+        point_type='float64'),    
     dict(
         type='MultiScaleFlipAug3D',
         img_scale=(1333, 800),
@@ -189,11 +166,11 @@ test_pipeline = [
                 rot_range=[0, 0],
                 scale_ratio_range=[1., 1.],
                 translation_std=[0, 0, 0]),
-            dict(type='RandomFlipLidarOnly'),
+            dict(type='RandomFlip3D'),
             dict(
                 type='PointsRangeFilter', point_cloud_range=point_cloud_range),
             dict(
-                type='DefaultFormatBundleMultiCam3D',
+                type='DefaultFormatBundle3D',
                 class_names=class_names,
                 with_label=False),
             dict(type='Collect3D', keys=['points'])
@@ -209,10 +186,8 @@ eval_pipeline = [
         use_dim=4,
         point_type='float64',
         file_client_args=file_client_args),
-    dict(type='LoadMultiCamImagesFromFile'),
-    dict(type='PaintPointsWithImageFeature', used_cameras=4),
     dict(
-        type='DefaultFormatBundleMultiCam3D',
+        type='DefaultFormatBundle3D',
         class_names=class_names,
         with_label=False),
     dict(type='Collect3D', keys=['points'])
@@ -278,10 +253,22 @@ optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # PointPillars usually need longer schedule than second, we simply double
 # the training schedule. Do remind that since we use RepeatDataset and
 # repeat factor is 2, so we actually train 160 epochs.
-runner = dict(max_epochs=80)
+lr_config = dict(
+    policy='cyclic',
+    target_ratio=(10, 1e-4),
+    cyclic_times=1,
+    step_ratio_up=0.3,
+)
+momentum_config = dict(
+    policy='cyclic',
+    target_ratio=(0.85 / 0.95, 1),
+    cyclic_times=1,
+    step_ratio_up=0.3,
+)
+runner = dict(max_epochs=100)
 
 # Use evaluation interval=2 reduce the number of evaluation timese
 evaluation = dict(interval=10, pipeline=eval_pipeline)
 checkpoint_config = dict(interval=2)
 workflow = [('train', 2), ('val', 1)]
-# resume_from = '/mnt/intel/jupyterhub/swc/train_log/mm3d/prefusion_L4_all_class_80e_p32000_pt8_v_025/20220915-155132/epoch_43.pth'
+resume_from = '/mnt/intel/jupyterhub/swc/train_log/mm3d/pointpillars_L4_vehicle_80e_p32000_pt8_v_025/20220920-200821/epoch_32.pth'

@@ -36,7 +36,7 @@ model = dict(
         out_channels=[128, 128, 128]),
     bbox_head=dict(
         type='Anchor3DHead',
-        num_classes=4,
+        num_classes=2,
         in_channels=384,
         feat_channels=384,
         use_direction_classifier=True,
@@ -44,13 +44,10 @@ model = dict(
         anchor_generator=dict(
             type='AlignedAnchor3DRangeGenerator',
             ranges=[
-                [-50, -50.0, -0.6, 150.0, 50.0, -0.6],  # FIXME(swc): z_range need to be confirmed
-                [-50, -50.0, -0.6, 150.0, 50.0, -0.6],
                 [-50, -50.0, -1.78, 150.0, 50.0, -1.78],
                 [-50, -50.0, -0.3, 150.0, 50.0, -0.3]
             ],
-            sizes=[[0.8, 0.6, 1.73], # ped
-                   [1.76, 0.6, 1.73], # cyclist
+            sizes=[
                    [4.63, 1.97, 1.74], # car
                    [12.5, 2.94, 3.47],  # truck
                    ],
@@ -70,20 +67,6 @@ model = dict(
     # model training and testing settings
     train_cfg=dict(
         assigner=[
-            dict(  # for Pedestrian
-                type='MaxIoUAssigner',
-                iou_calculator=dict(type='BboxOverlapsNearest3D'),
-                pos_iou_thr=0.5,
-                neg_iou_thr=0.35,
-                min_pos_iou=0.35,
-                ignore_iof_thr=-1),
-            dict(  # for Cyclist
-                type='MaxIoUAssigner',
-                iou_calculator=dict(type='BboxOverlapsNearest3D'),
-                pos_iou_thr=0.5,
-                neg_iou_thr=0.35,
-                min_pos_iou=0.35,
-                ignore_iof_thr=-1),
             dict(  # for Car
                 type='MaxIoUAssigner',
                 iou_calculator=dict(type='BboxOverlapsNearest3D'),
@@ -115,7 +98,7 @@ model = dict(
 dataset_type = 'PlusKittiDataset'
 data_root = '/home/wancheng.shen/datasets/CN_L4_origin_data/'
 benchmark_root = '/home/wancheng.shen/datasets/CN_L4_origin_benchmark/'
-class_names = ['Pedestrian', 'Cyclist', 'Car', 'Truck']
+class_names = ['Car', 'Truck']
 input_modality = dict(use_lidar=True, use_camera=True)
 
 file_client_args = dict(backend='disk')
@@ -278,7 +261,20 @@ optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # PointPillars usually need longer schedule than second, we simply double
 # the training schedule. Do remind that since we use RepeatDataset and
 # repeat factor is 2, so we actually train 160 epochs.
-runner = dict(max_epochs=80)
+runner = dict(max_epochs=100)
+
+lr_config = dict(
+    policy='cyclic',
+    target_ratio=(10, 1e-4),
+    cyclic_times=1,
+    step_ratio_up=0.3,
+)
+momentum_config = dict(
+    policy='cyclic',
+    target_ratio=(0.85 / 0.95, 1),
+    cyclic_times=1,
+    step_ratio_up=0.3,
+)
 
 # Use evaluation interval=2 reduce the number of evaluation timese
 evaluation = dict(interval=10, pipeline=eval_pipeline)
