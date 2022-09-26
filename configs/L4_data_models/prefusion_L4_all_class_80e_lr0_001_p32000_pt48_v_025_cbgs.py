@@ -9,7 +9,7 @@ point_cloud_range = [-50, -50, -2, 150, 50, 6]
 model = dict(
     type='VoxelNet',
     voxel_layer=dict(
-        max_num_points=8,  # max_points_per_voxel
+        max_num_points=48,  # max_points_per_voxel
         point_cloud_range=[-50, -50, -2, 150, 50, 6],
         voxel_size=voxel_size,
         max_voxels=(32000, 32000)  # (training, testing) max_voxels
@@ -44,7 +44,7 @@ model = dict(
         anchor_generator=dict(
             type='AlignedAnchor3DRangeGenerator',
             ranges=[
-                [-50, -50.0, -0.6, 150.0, 50.0, -0.6],  # FIXME(swc): z_range need to be confirmed
+                [-50, -50.0, -0.6, 150.0, 50.0, -0.6],
                 [-50, -50.0, -0.6, 150.0, 50.0, -0.6],
                 [-50, -50.0, -1.78, 150.0, 50.0, -1.78],
                 [-50, -50.0, -0.3, 150.0, 50.0, -0.3]
@@ -74,29 +74,29 @@ model = dict(
                 type='MaxIoUAssigner',
                 iou_calculator=dict(type='BboxOverlapsNearest3D'),
                 pos_iou_thr=0.5,
-                neg_iou_thr=0.35,
-                min_pos_iou=0.35,
+                neg_iou_thr=0.2,
+                min_pos_iou=0,
                 ignore_iof_thr=-1),
             dict(  # for Cyclist
                 type='MaxIoUAssigner',
                 iou_calculator=dict(type='BboxOverlapsNearest3D'),
                 pos_iou_thr=0.5,
-                neg_iou_thr=0.35,
-                min_pos_iou=0.35,
+                neg_iou_thr=0.2,
+                min_pos_iou=0,
                 ignore_iof_thr=-1),
             dict(  # for Car
                 type='MaxIoUAssigner',
                 iou_calculator=dict(type='BboxOverlapsNearest3D'),
                 pos_iou_thr=0.6,
                 neg_iou_thr=0.45,
-                min_pos_iou=0.45,
+                min_pos_iou=0,
                 ignore_iof_thr=-1),
             dict(  # for Truck
                 type='MaxIoUAssigner',
                 iou_calculator=dict(type='BboxOverlapsNearest3D'),
                 pos_iou_thr=0.55,
                 neg_iou_thr=0.4,
-                min_pos_iou=0.4,
+                min_pos_iou=0,
                 ignore_iof_thr=-1),
         ],
         allowed_border=0,
@@ -106,10 +106,10 @@ model = dict(
         use_rotate_nms=True,
         nms_across_levels=False,
         nms_thr=0.01,
-        score_thr=0.1,
+        score_thr=0.3,
         min_bbox_size=0,
-        nms_pre=100,
-        max_num=50))
+        nms_pre=4096,
+        max_num=500))
 
 # dataset settings
 dataset_type = 'PlusKittiDataset'
@@ -268,15 +268,12 @@ data = dict(
 
 # In practice PointPillars also uses a different schedule
 # optimizer
-lr = 0.004
+lr = 0.001
 optimizer = dict(lr=lr)
 # max_norm=35 is slightly better than 10 for PointPillars in the earlier
 # development of the codebase thus we keep the setting. But we does not
 # specifically tune this parameter.
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
-# PointPillars usually need longer schedule than second, we simply double
-# the training schedule. Do remind that since we use RepeatDataset and
-# repeat factor is 2, so we actually train 160 epochs.
 runner = dict(max_epochs=80)
 
 # Use evaluation interval=2 reduce the number of evaluation timese
