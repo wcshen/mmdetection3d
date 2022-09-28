@@ -29,6 +29,7 @@ color='rgbcmyk'
         
 def main(exps: List[str],indexs: List[int],distance: int,save_plot_path: str):
     tpr_files = []
+    os.makedirs(save_plot_path, exist_ok=True)
     for exp, index in zip(exps, indexs):
         cur_exp_tpr = []
         cur_tpr_files = list(filter(lambda x:(x.startswith('tpr') and not x.endswith('png')), os.listdir(exp)))

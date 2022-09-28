@@ -324,7 +324,7 @@ class DynamicPillarFeatureNet(PillarFeatureNet):
 
 
 @VOXEL_ENCODERS.register_module()
-class FusePillarFeatureNet(nn.Module):
+class OnlyLidarPillarFeatureNet(nn.Module):
     """Pillar Feature Net.
 
     The network prepares the pillar features and performs forward pass
@@ -366,7 +366,7 @@ class FusePillarFeatureNet(nn.Module):
                  norm_cfg=dict(type='BN1d', eps=1e-3, momentum=0.01),
                  mode='max',
                  legacy=True):
-        super(PillarFeatureNet, self).__init__()
+        super(OnlyLidarPillarFeatureNet, self).__init__()
         assert len(feat_channels) > 0
         self.legacy = legacy
         if with_cluster_center:
@@ -421,7 +421,9 @@ class FusePillarFeatureNet(nn.Module):
         Returns:
             torch.Tensor: Features of pillars.
         """
-        features_ls = [features]
+        lidar_features = features[:, :, :4]
+        camera_features = features[:, :, 4:]
+        features_ls = [lidar_features]
         # Find distance of x, y, and z from cluster center
         if self._with_cluster_center:
             points_mean = features[:, :, :3].sum(
@@ -462,16 +464,19 @@ class FusePillarFeatureNet(nn.Module):
             features_ls.append(points_dist)
 
         # Combine together feature decorations
-        features = torch.cat(features_ls, dim=-1)
+        lidar_features = torch.cat(features_ls, dim=-1)
         # The feature decorations were calculated without regard to whether
         # pillar was empty. Need to ensure that
         # empty pillars remain set to zeros.
-        voxel_count = features.shape[1]
+        voxel_count = lidar_features.shape[1]
         mask = get_paddings_indicator(num_points, voxel_count, axis=0)
         mask = torch.unsqueeze(mask, -1).type_as(features)
-        features *= mask
+        lidar_features *= mask
 
         for pfn in self.pfn_layers:
-            features = pfn(features, num_points)
-
-        return features.squeeze(1)
+            features = pfn(lidar_features, num_points)
+        lidar_features = features.squeeze(1)
+        
+        lidar_camera_features = torch.cat([lidar_features, camera_features], dim=-1)
+        
+        return lidar_camera_features

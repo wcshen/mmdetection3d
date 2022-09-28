@@ -3,7 +3,7 @@ import numpy as np
 from torch.nn import functional as F
 import torch
 import copy
-\
+
 from mmdet3d.core.points import LiDARPoints
 
 camera_names = ['front_left_camera', 'front_right_camera',
@@ -13,9 +13,9 @@ camera_names = ['front_left_camera', 'front_right_camera',
 @PIPELINES.register_module()
 class PaintPointsWithImageFeature:
     
-    def __init__(self, used_cameras=4):
+    def __init__(self, used_cameras=4, avg_flag=True):
         self.used_cameras = used_cameras
-    
+        self.avg_flag = avg_flag
      
     def get_image_features(self, images_path):
         full_image_features = []
@@ -35,7 +35,7 @@ class PaintPointsWithImageFeature:
         image_features = self.get_image_features(results['filename'])
         lidar_raw = results['points'].tensor.numpy()
         
-        point_features_list = []
+        camera_features_list = []
         for camera_idx in range(self.used_cameras):
             img_feature = image_features[camera_idx]
             cam_calib = results['lidar2img'][camera_idx]
@@ -56,18 +56,24 @@ class PaintPointsWithImageFeature:
             grid = grid.float()
             # align_corner=True provides higher performance
             mode = 'bilinear'
-            point_features = F.grid_sample(
+            camera_features = F.grid_sample(
             img_feature,
             grid,
             mode=mode,
             padding_mode='zeros',
             align_corners=True)  # 1xCx1xN feats
-            point_features = point_features.squeeze().t().numpy().astype(np.float64)  # (N, c)
-            point_features_list.append(point_features)
+            camera_features = camera_features.squeeze().t().numpy().astype(np.float64)  # (N, c)
+            camera_features_list.append(camera_features)
             
-        multi_point_features = np.stack(point_features_list, axis=0)
-        multi_point_features = np.mean(multi_point_features, axis=0)  # TODO(swc): just avg now
-        augmented_lidar = np.concatenate((lidar_raw, multi_point_features), axis=1)
+        all_camera_features = np.stack(camera_features_list, axis=0)
+        if self.avg_flag:
+            all_camera_features = np.mean(all_camera_features, axis=0)  # TODO(swc): just avg now
+        else:
+            front_camera_feature = np.max(all_camera_features[:2], axis=0)
+            side_camera_feature = np.max(all_camera_features[2:], axis=0)
+            all_camera_features = np.concatenate([front_camera_feature, side_camera_feature], axis=-1)
+            
+        augmented_lidar = np.concatenate((lidar_raw, all_camera_features), axis=1)
         augmented_lidar = LiDARPoints(augmented_lidar, points_dim=augmented_lidar.shape[-1])
         results['points'] = augmented_lidar
         return results
