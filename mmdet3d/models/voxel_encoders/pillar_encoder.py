@@ -477,6 +477,9 @@ class OnlyLidarPillarFeatureNet(nn.Module):
             features = pfn(lidar_features, num_points)
         lidar_features = features.squeeze(1)
         
+        camera_features = torch.max(camera_features, dim=1, keepdim=True)[0]
+        camera_features = camera_features.squeeze(1)
+        
         lidar_camera_features = torch.cat([lidar_features, camera_features], dim=-1)
         
         return lidar_camera_features

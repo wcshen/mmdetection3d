@@ -22,7 +22,7 @@ model = dict(
         voxel_size=voxel_size,
         point_cloud_range=[-50, -50, -2, 150, 50, 6]),
     middle_encoder=dict(
-        type='FusePointPillarsScatter', in_channels=64*3, output_shape=[400, 800]),
+        type='FusePointPillarsScatter', in_channels=64*2, output_shape=[400, 800]),
     backbone=dict(
         type='SECOND',
         in_channels=64,
@@ -154,7 +154,7 @@ train_pipeline = [
         file_client_args=file_client_args),
     # dict(type='ObjectSample', db_sampler=db_sampler, use_ground_plane=True),
     dict(type='LoadMultiCamImagesFromFile'),
-    dict(type='PaintPointsWithImageFeature', used_cameras=4, avg_flag=False),
+    dict(type='PaintPointsWithImageFeature', used_cameras=4),
     dict(type='RandomFlipLidarOnly', flip_ratio_bev_horizontal=0.5),
     dict(
         type='GlobalRotScaleTrans',
@@ -176,7 +176,7 @@ test_pipeline = [
         file_client_args=file_client_args,
         point_type='float64'),
     dict(type='LoadMultiCamImagesFromFile'),
-    dict(type='PaintPointsWithImageFeature', used_cameras=4, avg_flag=False),
+    dict(type='PaintPointsWithImageFeature', used_cameras=4),
     
     dict(
         type='MultiScaleFlipAug3D',
@@ -210,7 +210,7 @@ eval_pipeline = [
         point_type='float64',
         file_client_args=file_client_args),
     dict(type='LoadMultiCamImagesFromFile'),
-    dict(type='PaintPointsWithImageFeature', used_cameras=4, avg_flag=False),
+    dict(type='PaintPointsWithImageFeature', used_cameras=4),
     dict(
         type='DefaultFormatBundleMultiCam3D',
         class_names=class_names,
@@ -220,7 +220,7 @@ eval_pipeline = [
 
 data = dict(
     samples_per_gpu=4,
-    workers_per_gpu=4,
+    workers_per_gpu=8,
     train=dict(
         type='RepeatDataset',
         times=2,

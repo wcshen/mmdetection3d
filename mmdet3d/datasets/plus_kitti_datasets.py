@@ -509,7 +509,8 @@ class PlusKittiDataset(KittiDataset):
                  out_dir=None,
                  pipeline=None,
                  eval_result_dir=None,
-                 eval_file_tail=None):
+                 eval_file_tail=None,
+                 test_flag=False):
         """Evaluation in KITTI protocol.
 
         Args:
@@ -534,61 +535,35 @@ class PlusKittiDataset(KittiDataset):
         Returns:
             dict[str, float]: Results of each evaluation metric.
         """
-        result_files, tmp_dir = self.format_results(results, pklfile_prefix)  # result_files: a list of all annos of each frame
-        from mmdet3d.core.evaluation import kitti_eval
-        gt_annos = [self.anno_lidar2cam(info['annos'], info['calib']) for info in self.data_infos]
-
-        # to pcdet format
-        self.eval_cnt+=1
-        if eval_file_tail:
-            eval_cnt = eval_file_tail
-        else:
-            eval_cnt = self.eval_cnt
+        result_dict = None
         from mmdet3d.core.evaluation import get_formatted_results
         det_pcdet = self.bbox2result_pcdet(results, self.CLASSES, pklfile_prefix)
-        gt_annos_pcdet = []
-        for info in self.data_infos:
-            gt_boxes = info['annos']['gt_boxes_lidar'] 
-            gt_names = info['annos']['name'] 
-            gt_anno = {'gt_boxes': gt_boxes, 'name': gt_names}
-            gt_annos_pcdet.append(gt_anno)
-            
-        if isinstance(result_files, dict):
-            ap_dict = dict()
-            for name, result_files_ in result_files.items():
-                eval_types = ['bbox', 'bev', '3d']
-                if 'img' in name:
-                    eval_types = ['bbox']
-                ap_result_str, ap_dict_ = kitti_eval(
-                    gt_annos,
-                    result_files_,
-                    self.CLASSES,
-                    eval_types=eval_types)
-                for ap_type, ap in ap_dict_.items():
-                    ap_dict[f'{name}/{ap_type}'] = float('{:.4f}'.format(ap))
-
-                # print_log(
-                #     f'Results of {name}:\n' + ap_result_str, logger=logger)
-        else:
-            if metric == 'img_bbox':
-                ap_result_str, ap_dict = kitti_eval(
-                    gt_annos, result_files, self.CLASSES, eval_types=['bbox'])
+        if(not test_flag):
+            # to pcdet format
+            self.eval_cnt+=10
+            if eval_file_tail:
+                eval_cnt = eval_file_tail
             else:
-                ap_result_str, ap_dict = kitti_eval(gt_annos, result_files,  # kitti_eval entry
-                                                    self.CLASSES, eval_types=['bev', '3d']) # add eval type 
-            # print_log('\n' + ap_result_str, logger=logger)
+                eval_cnt = self.eval_cnt
+            
+            gt_annos_pcdet = []
+            for info in self.data_infos:
+                gt_boxes = info['annos']['gt_boxes_lidar'] 
+                gt_names = info['annos']['name'] 
+                gt_anno = {'gt_boxes': gt_boxes, 'name': gt_names}
+                gt_annos_pcdet.append(gt_anno)
 
-        result_str, result_dict = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, det_pcdet, eval_result_dir, eval_cnt)
-        
-        print_log('\n' + '****************pcdet eval start.*****************', logger=logger)
-        print_log('\n' + result_str, logger=logger)
-        print_log('\n' + '****************pcdet eval done.*****************', logger=logger)
+            result_str, result_dict = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, det_pcdet, eval_result_dir, eval_cnt)
+            
+            print_log('\n' + '****************pcdet eval start.*****************', logger=logger)
+            print_log('\n' + result_str, logger=logger)
+            print_log('\n' + '****************pcdet eval done.*****************', logger=logger)
 
-        eval_file_name = f'human_readable_results_{eval_cnt}.txt'
-        
-        if eval_result_dir is not None:
-            with open(os.path.join(eval_result_dir, eval_file_name), 'w') as f:
-                f.write(result_str)
+            eval_file_name = f'human_readable_results_{eval_cnt}.txt'
+            
+            if eval_result_dir is not None:
+                with open(os.path.join(eval_result_dir, eval_file_name), 'w') as f:
+                    f.write(result_str)
         if show:
             self.save_eval_results(det_pcdet, out_dir)
         return result_dict
@@ -623,7 +598,7 @@ class PlusKittiDataset(KittiDataset):
             pred_bboxes = result['dt_boxes']
             scores = result['scores']
             names = result['name']
-            path=str(results_dir / ("%s.jpg" % (pts_path)))
+            path=results_dir + f"/{pts_path}.jpg"
             bev_img = plot_gt_det_cmp(points, [], pred_bboxes, self.pcd_limit_range, path=None, scores=scores, names=names)
             all_image = self.concate_img(detect_img, bev_img)
             cv2.imwrite(path, all_image)
