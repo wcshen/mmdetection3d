@@ -1,16 +1,16 @@
 _base_ = [
-    '../_base_/schedules/cyclic_40e.py', '../_base_/default_runtime.py'
+    '../../_base_/schedules/cyclic_40e.py', '../../_base_/default_runtime.py'
 ]
 
 # model settings
-voxel_size = [0.25, 0.25, 8]
-point_cloud_range = [-50, -50, -2, 150, 50, 6]
+voxel_size = [0.32, 0.32, 8]
+point_cloud_range = [-50, -51.2, -2, 154.8, 51.2, 6]
 
 model = dict(
     type='VoxelNet',
     voxel_layer=dict(
         max_num_points=48,  # max_points_per_voxel
-        point_cloud_range=[-50, -50, -2, 150, 50, 6],
+        point_cloud_range=point_cloud_range,
         voxel_size=voxel_size,
         max_voxels=(32000, 32000)  # (training, testing) max_voxels
     ),
@@ -20,9 +20,9 @@ model = dict(
         feat_channels=[64],
         with_distance=False,
         voxel_size=voxel_size,
-        point_cloud_range=[-50, -50, -2, 150, 50, 6]),
+        point_cloud_range=point_cloud_range),
     middle_encoder=dict(
-        type='FusePointPillarsScatter', in_channels=64*2, output_shape=[400, 800]),
+        type='FusePointPillarsScatter', in_channels=64*3, output_shape=[320, 640]),
     backbone=dict(
         type='SECOND',
         in_channels=64,
@@ -44,10 +44,10 @@ model = dict(
         anchor_generator=dict(
             type='AlignedAnchor3DRangeGenerator',
             ranges=[
-                [-50, -50.0, -0.6, 150.0, 50.0, -0.6],
-                [-50, -50.0, -0.6, 150.0, 50.0, -0.6],
-                [-50, -50.0, -1.78, 150.0, 50.0, -1.78],
-                [-50, -50.0, -0.3, 150.0, 50.0, -0.3]
+                [-50, -51.2, -0.6, 154.8, 51.2, -0.4],
+                [-50, -51.2, -0.6, 154.8, 51.2, -0.4],
+                [-50, -51.2, -1.78, 154.8, 51.2, -0.4],
+                [-50, -51.2, -0.3, 154.8, 51.2, -0.6]
             ],
             sizes=[[0.8, 0.6, 1.73], # ped
                    [1.76, 0.6, 1.73], # cyclist
@@ -106,7 +106,7 @@ model = dict(
         use_rotate_nms=True,
         nms_across_levels=False,
         nms_thr=0.01,
-        score_thr=0.1,
+        score_thr=0.3,
         min_bbox_size=0,
         nms_pre=4096,
         max_num=500))
@@ -154,7 +154,7 @@ train_pipeline = [
         file_client_args=file_client_args),
     # dict(type='ObjectSample', db_sampler=db_sampler, use_ground_plane=True),
     dict(type='LoadMultiCamImagesFromFile'),
-    dict(type='PaintPointsWithImageFeature', used_cameras=4),
+    dict(type='PaintPointsWithImageFeature', used_cameras=4, avg_flag=False),
     dict(type='RandomFlipLidarOnly', flip_ratio_bev_horizontal=0.5),
     dict(
         type='GlobalRotScaleTrans',
@@ -176,7 +176,7 @@ test_pipeline = [
         file_client_args=file_client_args,
         point_type='float64'),
     dict(type='LoadMultiCamImagesFromFile'),
-    dict(type='PaintPointsWithImageFeature', used_cameras=4),
+    dict(type='PaintPointsWithImageFeature', used_cameras=4, avg_flag=False),
     
     dict(
         type='MultiScaleFlipAug3D',
@@ -210,7 +210,7 @@ eval_pipeline = [
         point_type='float64',
         file_client_args=file_client_args),
     dict(type='LoadMultiCamImagesFromFile'),
-    dict(type='PaintPointsWithImageFeature', used_cameras=4),
+    dict(type='PaintPointsWithImageFeature', used_cameras=4, avg_flag=False),
     dict(
         type='DefaultFormatBundleMultiCam3D',
         class_names=class_names,
@@ -275,14 +275,10 @@ optimizer = dict(lr=lr)
 # development of the codebase thus we keep the setting. But we does not
 # specifically tune this parameter.
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
-# PointPillars usually need longer schedule than second, we simply double
-# the training schedule. Do remind that since we use RepeatDataset and
-# repeat factor is 2, so we actually train 160 epochs.
-runner = dict(max_epochs=80)
+runner = dict(max_epochs=100)
 
 # Use evaluation interval=2 reduce the number of evaluation timese
 evaluation = dict(interval=10, pipeline=eval_pipeline)
 checkpoint_config = dict(interval=2)
 workflow = [('train', 2), ('val', 1)]
-find_unused_parameters=True
 # resume_from = '/mnt/intel/jupyterhub/swc/train_log/mm3d/prefusion_L4_all_class_80e_p32000_pt8_v_025/20220915-155132/epoch_43.pth'
