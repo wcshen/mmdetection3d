@@ -33,6 +33,7 @@ def main(exps: List[str],indexs: List[int],distance: int,save_plot_path: str):
     for exp, index in zip(exps, indexs):
         cur_exp_tpr = []
         cur_tpr_files = list(filter(lambda x:(x.startswith('tpr') and not x.endswith('png')), os.listdir(exp)))
+        cur_tpr_files.sort()
         for cur_tpr_file in cur_tpr_files:
             file_split = cur_tpr_file.split('_')
             cur_distance = int(file_split[1])
@@ -57,9 +58,9 @@ def main(exps: List[str],indexs: List[int],distance: int,save_plot_path: str):
 
 if __name__ == '__main__':
     # fire.Fire(main)
-    exps = ['/mnt/intel/jupyterhub/swc/train_log/mm3d/pointpillars_L4_all_class_160e_lr0_001_p32000_pt48_v_025_cbgs/20220926-195601/eval',
-          '/mnt/intel/jupyterhub/swc/train_log/mm3d/pointpillars_L4_all_class_160e_lr0_001_p32000_pt48_v_025/20220926-193257/eval']
-    indexs = [8, 8]
-    distance = 150
-    save_plot_path = '/mnt/intel/jupyterhub/swc/train_log/mm3d/pointpillars_L4_all_class_160e_lr0_001_p32000_pt48_v_025_cbgs/20220926-195601/ap_curve'
+    exps = ['/mnt/intel/jupyterhub/swc/train_log/mm3d/pointpillars_L4_all_class_200e_lr0_001_p32000_pt48_v_032/20221001-000342/eval',
+          '/mnt/intel/jupyterhub/swc/train_log/mm3d/prefusion_L4_all_class_200e_lr0_001_p32000_pt48_v_032/20221001-002750/eval']
+    indexs = [80, 80]
+    distance = 200
+    save_plot_path = '/mnt/intel/jupyterhub/swc/train_log/mm3d/pointpillars_L4_all_class_200e_lr0_001_p32000_pt48_v_032/20221001-000342/ap_curve'
     main(exps, indexs, distance, save_plot_path)
