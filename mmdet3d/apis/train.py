@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+from cProfile import run
 import random
 import warnings
 

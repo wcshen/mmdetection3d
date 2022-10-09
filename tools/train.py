@@ -229,6 +229,8 @@ def main():
         # in case we use a dataset wrapper
         if 'dataset' in cfg.data.train:
             val_dataset.pipeline = cfg.data.train.dataset.pipeline
+        elif 'datasets' in cfg.data.train:
+            val_dataset.pipeline = cfg.data.train.datasets[0].pipeline
         else:
             val_dataset.pipeline = cfg.data.train.pipeline
         # set test_mode=False here in deep copied config

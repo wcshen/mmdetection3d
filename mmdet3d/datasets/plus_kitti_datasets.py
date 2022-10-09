@@ -88,9 +88,7 @@ class PlusKittiDataset(KittiDataset):
         if hasattr(self, 'flag'):
             self.flag = self.flag[::load_interval]
 
-        self.camera_names = ['front_left_camera', 'front_right_camera',
-                             'side_left_camera', 'side_right_camera',
-                             'rear_left_camera', 'rear_right_camera']
+        self.camera_names = ['front_left_camera', 'front_right_camera']
         self.eval_cnt = 0
 
     def load_annotations(self, ann_file):
@@ -534,12 +532,8 @@ class PlusKittiDataset(KittiDataset):
         Returns:
             dict[str, float]: Results of each evaluation metric.
         """
-        result_files, tmp_dir = self.format_results(results, pklfile_prefix)  # result_files: a list of all annos of each frame
-        from mmdet3d.core.evaluation import kitti_eval
-        gt_annos = [self.anno_lidar2cam(info['annos'], info['calib']) for info in self.data_infos]
-
         # to pcdet format
-        self.eval_cnt+=1
+        self.eval_cnt+=10
         if eval_file_tail:
             eval_cnt = eval_file_tail
         else:
@@ -552,31 +546,6 @@ class PlusKittiDataset(KittiDataset):
             gt_names = info['annos']['name'] 
             gt_anno = {'gt_boxes': gt_boxes, 'name': gt_names}
             gt_annos_pcdet.append(gt_anno)
-            
-        if isinstance(result_files, dict):
-            ap_dict = dict()
-            for name, result_files_ in result_files.items():
-                eval_types = ['bbox', 'bev', '3d']
-                if 'img' in name:
-                    eval_types = ['bbox']
-                ap_result_str, ap_dict_ = kitti_eval(
-                    gt_annos,
-                    result_files_,
-                    self.CLASSES,
-                    eval_types=eval_types)
-                for ap_type, ap in ap_dict_.items():
-                    ap_dict[f'{name}/{ap_type}'] = float('{:.4f}'.format(ap))
-
-                # print_log(
-                #     f'Results of {name}:\n' + ap_result_str, logger=logger)
-        else:
-            if metric == 'img_bbox':
-                ap_result_str, ap_dict = kitti_eval(
-                    gt_annos, result_files, self.CLASSES, eval_types=['bbox'])
-            else:
-                ap_result_str, ap_dict = kitti_eval(gt_annos, result_files,  # kitti_eval entry
-                                                    self.CLASSES, eval_types=['bev', '3d']) # add eval type 
-            # print_log('\n' + ap_result_str, logger=logger)
 
         result_str, result_dict = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, det_pcdet, eval_result_dir, eval_cnt)
         

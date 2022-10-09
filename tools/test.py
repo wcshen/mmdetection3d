@@ -72,7 +72,7 @@ def parse_args():
     parser.add_argument('--show', action='store_true', help='show results')
     parser.add_argument('--plot_result', action='store_true', help='save results')
     parser.add_argument('--plus_eval', action='store_true', help='eval one pth')
-    
+    parser.add_argument('--eval_file_tail', type=int, default=0)
     parser.add_argument(
         '--show-dir', help='directory where results will be saved')
     parser.add_argument(
