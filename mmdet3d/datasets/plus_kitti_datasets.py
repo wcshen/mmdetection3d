@@ -490,6 +490,7 @@ class PlusKittiDataset(KittiDataset):
                  show=False,
                  out_dir=None,
                  pipeline=None,
+                 save_result=False,
                  eval_result_dir=None,
                  eval_file_tail=None):
         """Evaluation in KITTI protocol.
@@ -526,7 +527,6 @@ class PlusKittiDataset(KittiDataset):
         else:
             eval_cnt = self.eval_cnt
         from mmdet3d.core.evaluation import get_formatted_results
-        det_pcdet = self.bbox2result_pcdet(results, self.CLASSES, pklfile_prefix)
         gt_annos_pcdet = []
         for info in self.data_infos:
             gt_boxes = info['annos']['gt_boxes_lidar'] 
@@ -546,14 +546,16 @@ class PlusKittiDataset(KittiDataset):
                     self.CLASSES,
                     eval_types=eval_types)
                 
-                result_str, result_difficulty = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, result_files_, 0, 0,
-                '/home/rongbo.ma/mmdetection3d/debug', False)                
+                result_str, result_dict = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, result_files_, eval_result_dir, eval_cnt)
                 print_log('\n' + '****************pcdet eval start.*****************', logger=logger)
                 print_log('\n' + result_str, logger=logger)
                 print_log('\n' + '****************pcdet eval done.*****************', logger=logger)
 
                 for ap_type, ap in ap_dict_.items():
                     ap_dict[f'{name}/{ap_type}'] = float('{:.4f}'.format(ap))
+                    
+                if save_result:
+                    self.save_eval_results(result_files_, out_dir)
 
                 # print_log(
                 #     f'Results of {name}:\n' + ap_result_str, logger=logger)
@@ -565,20 +567,21 @@ class PlusKittiDataset(KittiDataset):
                 ap_result_str, ap_dict = kitti_eval(gt_annos, result_files,  # kitti_eval entry
                                                     self.CLASSES, eval_types=['bev', '3d']) # add eval type 
             # print_log('\n' + ap_result_str, logger=logger)
-
-        result_str, result_dict = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, det_pcdet, eval_result_dir, eval_cnt)
+            det_pcdet = self.bbox2result_pcdet(results, self.CLASSES, pklfile_prefix)
+            result_str, result_dict = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, det_pcdet, eval_result_dir, eval_cnt)
         
-        print_log('\n' + '****************pcdet eval start.*****************', logger=logger)
-        print_log('\n' + result_str, logger=logger)
-        print_log('\n' + '****************pcdet eval done.*****************', logger=logger)
+            print_log('\n' + '****************pcdet eval start.*****************', logger=logger)
+            print_log('\n' + result_str, logger=logger)
+            print_log('\n' + '****************pcdet eval done.*****************', logger=logger)
+            
+            if save_result:
+                self.save_eval_results(det_pcdet, out_dir)
 
         eval_file_name = f'human_readable_results_{eval_cnt}.txt'
         
         if eval_result_dir is not None:
             with open(os.path.join(eval_result_dir, eval_file_name), 'w') as f:
                 f.write(result_str)
-        if show:
-            self.save_eval_results(det_pcdet, out_dir)
         return result_dict
     
     @staticmethod
@@ -605,13 +608,13 @@ class PlusKittiDataset(KittiDataset):
             points = np.fromfile(file_name).reshape(-1, 4)
             
             img_path = data_info['image']['front_left_camera']['image_path'].replace('front_left_camera', 'front_left_camera_detect').replace('.jpg', '_detect.jpg')
-            detect_img = f"{self.root_split}/{img_path}"
+            detect_img = os.path.join(self.root_split, img_path)
             print(detect_img)
             detect_img = cv2.imread(detect_img)
             pred_bboxes = result['dt_boxes']
             scores = result['scores']
             names = result['name']
-            path=str(results_dir / ("%s.jpg" % (pts_path)))
+            path=os.path.join(results_dir, ("%s.jpg" % (pts_path)))
             bev_img = plot_gt_det_cmp(points, [], pred_bboxes, self.pcd_limit_range, path=None, scores=scores, names=names)
             all_image = self.concate_img(detect_img, bev_img)
             cv2.imwrite(path, all_image)

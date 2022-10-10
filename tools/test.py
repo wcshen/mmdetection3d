@@ -273,10 +273,12 @@ def main():
             os.makedirs(save_path, exist_ok=True)
             plot_save_dir = os.path.join(save_path, 'plot_results')
             os.makedirs(plot_save_dir, exist_ok=True)
+            pklfile_name = os.path.join(save_path,'epoch_'+str(eval_file_tail)+'_')
             eval_kwargs.update(dict(eval_file_tail=eval_file_tail,
                                     eval_result_dir=save_path,
                                     out_dir=plot_save_dir,
-                                    show=args.show
+                                    save_result=args.plot_result,
+                                    pklfile_prefix=pklfile_name
                                     ))
             print(dataset.evaluate(outputs, **eval_kwargs))
 
