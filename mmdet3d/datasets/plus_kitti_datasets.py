@@ -567,15 +567,15 @@ class PlusKittiDataset(KittiDataset):
                 ap_result_str, ap_dict = kitti_eval(gt_annos, result_files,  # kitti_eval entry
                                                     self.CLASSES, eval_types=['bev', '3d']) # add eval type 
             # print_log('\n' + ap_result_str, logger=logger)
-            det_pcdet = self.bbox2result_pcdet(results, self.CLASSES, pklfile_prefix)
-            result_str, result_dict = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, det_pcdet, eval_result_dir, eval_cnt)
+            # det_pcdet = self.bbox2result_pcdet(results, self.CLASSES, pklfile_prefix)
+            result_str, result_dict = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, result_files, eval_result_dir, eval_cnt)
         
             print_log('\n' + '****************pcdet eval start.*****************', logger=logger)
             print_log('\n' + result_str, logger=logger)
             print_log('\n' + '****************pcdet eval done.*****************', logger=logger)
             
             if save_result:
-                self.save_eval_results(det_pcdet, out_dir)
+                self.save_eval_results(result_files, out_dir)
 
         eval_file_name = f'human_readable_results_{eval_cnt}.txt'
         
