@@ -120,12 +120,10 @@ class FusePointPillarsScatter(nn.Module):
         self.nx = output_shape[1]
         self.in_channels = in_channels
         self.fp16_enabled = False
-        self.cbam_front_side = CBAMBlock(channel=64*2, reduction=16, kernel_size=7)
-        self.cbam_lidar_camera = CBAMBlock(channel=64*2, reduction=16, kernel_size=7)
-        self.front_ln = nn.LayerNorm(normalized_shape=(self.ny, self.nx))
-        self.side_ln = nn.LayerNorm(normalized_shape=(self.ny, self.nx))
-        self.camera_ln = nn.LayerNorm(normalized_shape=(self.ny, self.nx))
-        self.lidar_ln = nn.LayerNorm(normalized_shape=(self.ny, self.nx))
+        self.camera_downsample = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=3, padding=1)
+        self.fuse_downsample = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=3, padding=1)
+        self.cbam_lidar_camera = CBAMBlock(channel=64, reduction=16, kernel_size=7)
+
 
     @auto_fp16(apply_to=('voxel_features', ))
     def forward(self, voxel_features, coors, batch_size=None):
@@ -136,22 +134,12 @@ class FusePointPillarsScatter(nn.Module):
             pseudo_image = self.forward_batch(voxel_features, coors, batch_size)
         else:
             pseudo_image = self.forward_single(voxel_features, coors)
-        pseudo_image_dim = pseudo_image.shape[1]
-        modal_nums = pseudo_image_dim // 64
         lidar_features = pseudo_image[:, :64, :, :]
-        if modal_nums == 3:
-            front_camera_feature = pseudo_image[:, 64:128, :, :]
-            side_camera_feature = pseudo_image[:, 128:, :, :]
-            front_camera_feature = self.front_ln(front_camera_feature)
-            side_camera_feature = self.side_ln(side_camera_feature)
-            camera_features = torch.cat([front_camera_feature, side_camera_feature], dim=1)
-            camera_features = self.cbam_front_side(camera_features)
-        elif modal_nums == 2:
-            camera_features = pseudo_image[:, 64:, :, :]
-            
-        camera_features = self.camera_ln(camera_features)
-        lidar_features = self.lidar_ln(lidar_features)
-        fuse_features = torch.cat([lidar_features, camera_features], dim=1)
+        camera_features = pseudo_image[:, 64:, :, :] # 128
+        camera_features = self.camera_downsample(camera_features) # 64
+
+        fuse_features = torch.cat([lidar_features, camera_features], dim=1)  # 128
+        fuse_features = self.fuse_downsample(fuse_features) # 64
         fuse_features = self.cbam_lidar_camera(fuse_features)  # (b, 64, h, w)
         
         return fuse_features

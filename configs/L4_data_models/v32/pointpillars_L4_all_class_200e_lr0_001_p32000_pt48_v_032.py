@@ -268,7 +268,12 @@ optimizer = dict(lr=lr)
 # development of the codebase thus we keep the setting. But we does not
 # specifically tune this parameter.
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
-
+lr_config = dict(
+    policy='cyclic',
+    target_ratio=(10, 1e-3),
+    cyclic_times=1,
+    step_ratio_up=0.4,
+)
 runner = dict(max_epochs=100)
 
 # Use evaluation interval=2 reduce the number of evaluation timese

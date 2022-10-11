@@ -50,15 +50,13 @@ class CBAMBlock(nn.Module):
         super(CBAMBlock, self).__init__()
         self.ca = ChannelAttention(channel=channel, reduction=reduction)
         self.sa = SpatialAttention(kernel_size=kernel_size)
-        self.down_sample = torch.nn.Conv2d(channel, channel//2, 1)
 
     def forward(self, x):
         # b, c, _, _ = x.size()
-        # residual = x
+        residual = x
         out = x * self.ca(x)
         out = out * self.sa(out)
-        out = self.down_sample(out)
-        return out  # + residual
+        return out + residual
 
 
 if __name__ == '__main__':
