@@ -65,6 +65,7 @@ class PlusKittiDataset(KittiDataset):
                  filter_empty_gt=True,
                  test_mode=False,
                  load_interval=1,
+                 used_cameras=4,
                  pcd_limit_range=[0, -10, -3, 100.0, 10, 6.0],
                  **kwargs):
         super().__init__(
@@ -91,6 +92,7 @@ class PlusKittiDataset(KittiDataset):
         self.camera_names = ['front_left_camera', 'front_right_camera',
                              'side_left_camera', 'side_right_camera',
                              'rear_left_camera', 'rear_right_camera']
+        self.camera_names =self.camera_names[:used_cameras]
         self.eval_cnt = 0
 
     def load_annotations(self, ann_file):

@@ -6,7 +6,7 @@ from mmcv.runner import force_fp32
 from torch import nn
 
 from ..builder import VOXEL_ENCODERS
-from .utils import PFNLayer, get_paddings_indicator
+from .utils import PFNLayer,PcdetPFNLayer, get_paddings_indicator
 
 
 @VOXEL_ENCODERS.register_module()
@@ -47,7 +47,9 @@ class PillarFeatureNet(nn.Module):
                  point_cloud_range=(0, -40, -3, 70.4, 40, 1),
                  norm_cfg=dict(type='BN1d', eps=1e-3, momentum=0.01),
                  mode='max',
-                 legacy=True):
+                 legacy=True,
+                 use_pcdet=False,
+                 use_norm=True):
         super(PillarFeatureNet, self).__init__()
         assert len(feat_channels) > 0
         self.legacy = legacy
@@ -60,6 +62,8 @@ class PillarFeatureNet(nn.Module):
         self._with_distance = with_distance
         self._with_cluster_center = with_cluster_center
         self._with_voxel_center = with_voxel_center
+        self.use_pcdet = use_pcdet
+        self.use_norm = use_norm
         self.fp16_enabled = False
         # Create PillarFeatureNet layers
         self.in_channels = in_channels
@@ -72,13 +76,21 @@ class PillarFeatureNet(nn.Module):
                 last_layer = False
             else:
                 last_layer = True
-            pfn_layers.append(
-                PFNLayer(
+            if self.use_pcdet:
+                pfn_layers.append(
+                PcdetPFNLayer(
                     in_filters,
                     out_filters,
-                    norm_cfg=norm_cfg,
-                    last_layer=last_layer,
-                    mode=mode))
+                    use_norm=self.use_norm,
+                    last_layer=last_layer))
+            else:
+                pfn_layers.append(
+                    PFNLayer(
+                        in_filters,
+                        out_filters,
+                        norm_cfg=norm_cfg,
+                        last_layer=last_layer,
+                        mode=mode))
         self.pfn_layers = nn.ModuleList(pfn_layers)
 
         # Need pillar (voxel) size and x/y offset in order to calculate offset
@@ -153,10 +165,14 @@ class PillarFeatureNet(nn.Module):
         mask = torch.unsqueeze(mask, -1).type_as(features)
         features *= mask
 
+        if self.use_pcdet:
+            features = torch.unsqueeze(features, 0).permute((0, 3, 1, 2))
         for pfn in self.pfn_layers:
             features = pfn(features, num_points)
-
-        return features.squeeze(1)
+        if self.use_pcdet:
+            return features.squeeze().permute((1, 0))
+        else:
+            return features.squeeze(1)
 
 
 @VOXEL_ENCODERS.register_module()
