@@ -813,10 +813,18 @@ class TransFusionHead(nn.Module):
         bev_pos = self.bev_pos.repeat(batch_size, 1, 1).to(lidar_feat.device)
 
         if self.fuse_img:
-            img_feat = self.shared_conv_img(img_inputs)  # [BS * n_views, C, H, W]
-
-            img_h, img_w, num_channel = img_inputs.shape[-2], img_inputs.shape[-1], img_feat.shape[1]
+            feat_list = []
+            for meta in img_metas:
+                feat_list.append(meta['img_feature'].data)
+            
+            img_feat_meta = torch.cat(feat_list).squeeze(1)
+            img_h, img_w = img_feat_meta.shape[-2], img_feat_meta.shape[-1]
+            num_channel = 128
+            img_feat = self.shared_conv_img(img_feat_meta.to(lidar_feat.device))  # [BS * n_views, C, H, W]
+            
+            # img_h, img_w, num_channel = img_inputs.shape[-2], img_inputs.shape[-1], img_feat.shape[1]
             raw_img_feat = img_feat.view(batch_size, self.num_views, num_channel, img_h, img_w).permute(0, 2, 3, 1, 4) # [BS, C, H, n_views, W]
+            
             img_feat = raw_img_feat.reshape(batch_size, num_channel, img_h, img_w * self.num_views)  # [BS, C, H, n_views*W]
             img_feat_collapsed = img_feat.max(2).values
             img_feat_collapsed = self.fc(img_feat_collapsed).view(batch_size, num_channel, img_w * self.num_views)
@@ -903,7 +911,8 @@ class TransFusionHead(nn.Module):
             img_feat = raw_img_feat.permute(0, 3, 1, 2, 4) # [BS, n_views, C, H, W]
             img_feat_flatten = img_feat.view(batch_size, self.num_views, num_channel, -1)  # [BS, n_views, C, H*W]
             if self.img_feat_pos is None:
-                (h, w) = img_inputs.shape[-2], img_inputs.shape[-1]
+                # (h, w) = img_inputs.shape[-2], img_inputs.shape[-1] # todo
+                (h, w) = 104, 200 # todo
                 img_feat_pos = self.img_feat_pos = self.create_2D_grid(h, w).to(img_feat_flatten.device)
             else:
                 img_feat_pos = self.img_feat_pos
@@ -957,17 +966,18 @@ class TransFusionHead(nn.Module):
 
                     # img transformation: scale -> crop -> flip
                     # the image is resized by img_scale_factor
-                    img_coors = pts_2d[:, 0:2] * img_scale_factor  # Nx2
-                    img_coors -= img_crop_offset
+                    img_coors = pts_2d[:, 0:2]  # Nx2
+                    # img_coors = pts_2d[:, 0:2] * img_scale_factor  # Nx2
+                    # img_coors -= img_crop_offset
 
                     # grid sample, the valid grid range should be in [-1,1]
                     coor_x, coor_y = torch.split(img_coors, 1, dim=1)  # each is Nx1
 
-                    if img_flip:
-                        # by default we take it as horizontal flip
-                        # use img_shape before padding for flip
-                        orig_h, orig_w = img_shape
-                        coor_x = orig_w - coor_x
+                    # if img_flip:
+                    #     # by default we take it as horizontal flip
+                    #     # use img_shape before padding for flip
+                    #     orig_h, orig_w = img_shape
+                    #     coor_x = orig_w - coor_x
 
                     coor_x, coor_corner_x = coor_x[0:self.num_proposals, :], coor_x[self.num_proposals:, :]
                     coor_y, coor_corner_y = coor_y[0:self.num_proposals, :], coor_y[self.num_proposals:, :]
@@ -984,8 +994,10 @@ class TransFusionHead(nn.Module):
                     on_the_image_mask[sample_idx, on_the_image] = view_idx
 
                     # add spatial constraint
-                    center_ys = (coor_y[on_the_image] / self.out_size_factor_img)
-                    center_xs = (coor_x[on_the_image] / self.out_size_factor_img)
+                    k_h = h / 140.0
+                    k_w = h / 200.0
+                    center_ys = (coor_y[on_the_image] / k_h)  # todo!!!
+                    center_xs = (coor_x[on_the_image] / k_w)
                     centers = torch.cat([center_xs, center_ys], dim=-1).int()  # center on the feature map
                     corners = (coor_corner_xy[on_the_image].max(1).values - coor_corner_xy[on_the_image].min(1).values) / self.out_size_factor_img
                     radius = torch.ceil(corners.norm(dim=-1, p=2) / 2).int()  # radius of the minimum circumscribed circle of the wireframe

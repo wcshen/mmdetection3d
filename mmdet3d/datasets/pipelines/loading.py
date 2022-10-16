@@ -1176,6 +1176,7 @@ class LoadMultiCamImagesFromFile:
         results['img_shape'] = []
         results['ori_shape'] = []
         results['img_fields'] = ['img']
+        results['img_feature'] = []
 
         for filename in results['img_info']:
             img_bytes = self.file_client.get(filename)
@@ -1184,12 +1185,14 @@ class LoadMultiCamImagesFromFile:
             if self.to_float32:
                 img = img.astype(np.float32)
 
+            feature_name = filename.replace('_camera', '_camera_feature').replace('.jpg', '_0.npy')
             results['filename'].append(filename)
             results['ori_filename'].append(filename)
             results['img'].append(img)
             results['img_shape'].append(img.shape)
             results['ori_shape'].append(img.shape)
-
+            results['img_feature'].append(np.load(feature_name))
+        # print(results['img_shape'])
         return results
 
     def __repr__(self):

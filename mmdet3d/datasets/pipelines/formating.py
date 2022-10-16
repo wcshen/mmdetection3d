@@ -131,7 +131,7 @@ class Collect3D(object):
     def __init__(
             self,
             keys,
-            meta_keys=('filename', 'ori_shape', 'img_shape', 'lidar2img',
+            meta_keys=('filename', 'ori_shape', 'img_shape', 'lidar2img', 'img_feature',
                        'depth2img', 'cam2img', 'pad_shape', 'scale_factor', 'flip',
                        'pcd_horizontal_flip', 'pcd_vertical_flip', 'box_mode_3d',
                        'box_type_3d', 'img_norm_cfg', 'pcd_trans', 'sample_idx',
@@ -288,11 +288,26 @@ class DefaultFormatBundleMultiCam3D(object):
         self.with_label = with_label
 
     def _format_multi_cam_imgs(self, results):
+        img_list = []
         for idx, np_img in enumerate(results['img']):
-            img = np.ascontiguousarray(np_img.transpose(2, 0, 1))
-            img = DC(to_tensor(img), stack=True)
-            results['img'][idx] = img
-
+            # img = np.ascontiguousarray(np_img.transpose(2, 0, 1))
+            # img = DC(to_tensor(img), stack=True)
+            img = np_img.transpose(2,0,1)
+            img_list.append(img)
+            # results['img'][idx] = img
+            
+            # print(results['img'].shape,'-------------------')
+        imgs = np.ascontiguousarray(np.stack(img_list, axis=0))
+        results['img'] = DC(to_tensor(imgs), stack=True)
+        
+        if 'img_feature' in results:
+            feature_list = []
+            for idx, feat in enumerate(results['img_feature']):
+                feature_list.append(feat)
+            
+            feats = np.ascontiguousarray(np.stack(feature_list, axis=0))
+            results['img_feature'] = DC(to_tensor(feats), stack=True)
+        
         for key in [
             'proposals', 'gt_bboxes', 'gt_bboxes_ignore', 'gt_labels',
             'gt_labels_3d', 'attr_labels', 'pts_instance_mask',

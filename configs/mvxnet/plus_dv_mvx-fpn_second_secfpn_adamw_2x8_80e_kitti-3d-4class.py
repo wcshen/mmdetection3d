@@ -131,7 +131,7 @@ model = dict(
 
 # dataset settings
 dataset_type = 'PlusKittiDataset'
-data_root = 'data/kitti/'
+data_root = 'data/L4E_origin_data/'
 class_names = ['Pedestrian', 'Cyclist', 'Car', 'Truck']
 img_norm_cfg = dict(
     mean=[103.530, 116.280, 123.675], std=[1.0, 1.0, 1.0], to_rgb=False)
@@ -220,7 +220,7 @@ data = dict(
     val=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file=data_root + 'kitti_infos_val.pkl',
+        ann_file=data_root + 'Kitti_L4_data_mm3d_infos_train.pkl',
         split='training',
         pts_prefix='velodyne_reduced',
         pipeline=test_pipeline,
@@ -231,7 +231,7 @@ data = dict(
     test=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file=data_root + 'kitti_infos_val.pkl',
+        ann_file=data_root + 'Kitti_L4_data_mm3d_infos_train.pkl',
         split='training',
         pts_prefix='velodyne_reduced',
         pipeline=test_pipeline,
