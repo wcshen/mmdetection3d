@@ -221,6 +221,8 @@ def main():
         train_cfg=cfg.get('train_cfg'),
         test_cfg=cfg.get('test_cfg'))
     model.init_weights()
+    if cfg.use_sync_bn:
+        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
 
     logger.info(f'Model:\n{model}')
     datasets = [build_dataset(cfg.data.train)]

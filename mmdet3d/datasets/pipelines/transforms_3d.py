@@ -2040,10 +2040,9 @@ class RandomCenterGlobalRotScaleTrans(object):
             input_dict['transformation_3d_flow'] = []
             
         # find gt_boxes centers
-        rot_centers = [[0, 0, 0]]
         rot_centers = torch.zeros(size=(1, 3))
         gt_boxes_3d = input_dict['gt_bboxes_3d']
-        gt_boxes_centers = gt_boxes_3d.center() # torch.Tensor (N, 3)
+        gt_boxes_centers = gt_boxes_3d.bottom_center # torch.Tensor (N, 3)
         rot_centers = torch.concat([rot_centers, gt_boxes_centers], dim=0)
         rot_centers_cnts = rot_centers.shape[0]
         assign_rot_indedx = np.random.randint(0, rot_centers_cnts)
