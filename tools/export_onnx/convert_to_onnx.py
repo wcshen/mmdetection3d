@@ -14,8 +14,6 @@ def parse_config():
                         help='specify the config of model')
     parser.add_argument('--ckpt', type=str, default=None,
                         help='checkpoint to start from')
-    parser.add_argument('--do_cnn', action='store_true',
-                        help='use cnn instead of max pooling')
     args = parser.parse_args()
 
     cfg = Config.fromfile(args.cfg_file)
@@ -36,16 +34,13 @@ def main():
     vfe_cfg = cfg.model.voxel_encoder
     backbone_cfg = cfg.model.backbone
     head_cfg = cfg.model.bbox_head
-    model_setting = cfg.model
     # Build up models
     vfe_model = PillarFeatureNet(in_channels=vfe_cfg.in_channels,
                                  feat_channels=vfe_cfg.feat_channels,
                                  with_distance=vfe_cfg.with_distance,
-                                 voxel_size=cfg.voxel_size,
-                                 use_pcdet=vfe_cfg.use_pcdet,
-                                 point_cloud_range=vfe_cfg.point_cloud_range)
+                                 use_pcdet=vfe_cfg.use_pcdet)
 
-    rpn_model = RPN(backbone_cfg=backbone_cfg, head_cfg=head_cfg, model_setting=model_setting)
+    rpn_model = RPN(backbone_cfg=backbone_cfg, head_cfg=head_cfg)
 
     with torch.no_grad():
         checkpoint = torch.load(args.ckpt)
@@ -60,8 +55,10 @@ def main():
         rpn_state_dict = rpn_model.state_dict()
         for key, val in model_state_disk.items():
             if key[14:] in vfe_state_dict and vfe_state_dict[key[14:]].shape == model_state_disk[key].shape:
+                print(f"pth_dtype: {val.dtype}, vfe_type: {vfe_state_dict[key[14:]].dtype}  {key[14:]}")
                 vfe_update_model_state[key[14:]] = val
             if key in rpn_state_dict and rpn_state_dict[key].shape == model_state_disk[key].shape:
+                print(f"pth_dtype: {val.dtype}, rpn_type: {rpn_state_dict[key].dtype} {key}")
                 rpn_update_model_state[key] = val
 
         vfe_state_dict.update(vfe_update_model_state)

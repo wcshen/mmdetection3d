@@ -72,7 +72,7 @@ def parse_args():
     parser.add_argument('--show', action='store_true', help='show results')
     parser.add_argument('--plot_result', action='store_true', help='save results')
     parser.add_argument('--plus_eval', action='store_true', help='eval one pth')
-    
+    parser.add_argument('--test_flag', action='store_true', help='test flag')
     parser.add_argument(
         '--show-dir', help='directory where results will be saved')
     parser.add_argument(
@@ -276,7 +276,8 @@ def main():
             eval_kwargs.update(dict(eval_file_tail=eval_file_tail,
                                     eval_result_dir=save_path,
                                     out_dir=plot_save_dir,
-                                    show=args.show
+                                    show=args.show,
+                                    test_flag=args.test_flag
                                     ))
             print(dataset.evaluate(outputs, **eval_kwargs))
 
