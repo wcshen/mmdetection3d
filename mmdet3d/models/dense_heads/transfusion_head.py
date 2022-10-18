@@ -995,7 +995,7 @@ class TransFusionHead(nn.Module):
 
                     # add spatial constraint
                     k_h = h / 140.0
-                    k_w = h / 200.0
+                    k_w = w / 200.0
                     center_ys = (coor_y[on_the_image] / k_h)  # todo!!!
                     center_xs = (coor_x[on_the_image] / k_w)
                     centers = torch.cat([center_xs, center_ys], dim=-1).int()  # center on the feature map
