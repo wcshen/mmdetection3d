@@ -1,7 +1,7 @@
 _base_ = [
     '../_base_/schedules/cyclic_40e.py', '../_base_/default_runtime.py'
 ]
-
+use_sync_bn=False
 # model settings
 voxel_size = [0.25, 0.25, 8]
 point_cloud_range = [0, -10, -2, 100, 10, 6]
@@ -227,6 +227,7 @@ data = dict(
         modality=input_modality,
         classes=class_names,
         test_mode=True,
+        used_cameras=1,
         pcd_limit_range=point_cloud_range,
         box_type_3d='LiDAR',
         file_client_args=file_client_args),
@@ -240,6 +241,7 @@ data = dict(
         pipeline=test_pipeline,
         modality=input_modality,
         classes=class_names,
+        used_cameras=1,
         pcd_limit_range=point_cloud_range,
         test_mode=True,
         box_type_3d='LiDAR',

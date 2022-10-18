@@ -102,7 +102,7 @@ class PillarFeatureNet(nn.Module):
         self.z_offset = self.vz / 2 + point_cloud_range[2]
         self.point_cloud_range = point_cloud_range
 
-    @force_fp32(out_fp16=True)
+    # @force_fp32(out_fp16=True)
     def forward(self, features, num_points, coors):
         """Forward function.
 

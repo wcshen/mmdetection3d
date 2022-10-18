@@ -84,7 +84,7 @@ class Anchor3DHead(BaseModule, AnchorTrainMixin):
         warnings.warn(
             'dir_offset and dir_limit_offset will be depressed and be '
             'incorporated into box coder in the future')
-        self.fp16_enabled = False
+        # self.fp16_enabled = False
 
         # build anchor generator
         self.anchor_generator = build_prior_generator(anchor_generator)
@@ -102,7 +102,7 @@ class Anchor3DHead(BaseModule, AnchorTrainMixin):
         self.loss_cls = build_loss(loss_cls)
         self.loss_bbox = build_loss(loss_bbox)
         self.loss_dir = build_loss(loss_dir)
-        self.fp16_enabled = False
+        # self.fp16_enabled = False
 
         self._init_layers()
         self._init_assigner_sampler()
@@ -301,7 +301,7 @@ class Anchor3DHead(BaseModule, AnchorTrainMixin):
                            dim=-1)
         return boxes1, boxes2
 
-    @force_fp32(apply_to=('cls_scores', 'bbox_preds', 'dir_cls_preds'))
+    # @force_fp32(apply_to=('cls_scores', 'bbox_preds', 'dir_cls_preds'))
     def loss(self,
              cls_scores,
              bbox_preds,

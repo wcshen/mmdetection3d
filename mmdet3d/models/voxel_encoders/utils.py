@@ -207,7 +207,7 @@ class PcdetPFNLayer(nn.Module):
                  ):
 
         super().__init__()
-        self.fp16_enabled = False
+        # self.fp16_enabled = False
         self.name = 'PcdetPFNLayer'
         self.last_vfe = last_layer
         if not self.last_vfe:
@@ -219,7 +219,7 @@ class PcdetPFNLayer(nn.Module):
             self.conv_layer1 = nn.Conv2d(in_channels, out_channels,  kernel_size=1)
             self.norm = nn.BatchNorm2d(out_channels, eps=1e-3, momentum=0.01)
 
-    @auto_fp16(apply_to=('inputs'), out_fp32=True)
+    # @auto_fp16(apply_to=('inputs'), out_fp32=True)
     def forward(self, inputs, num_voxels=None, aligned_distance=None):
         """Forward function.
 
