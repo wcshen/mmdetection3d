@@ -4,7 +4,7 @@ function train()
 {
     PORT=30000 \
     bash tools/dist_train.sh \
-    configs/L4_data_models/prefusion_L4_all_class_80e_p32000_pt48_v_025.py \
+    configs/L3_data_models/pcdet_bev_fusion.py \
     4
 }
 

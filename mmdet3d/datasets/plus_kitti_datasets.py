@@ -197,23 +197,34 @@ class PlusKittiDataset(KittiDataset):
 
         img_filenames = []
         lidar2img_list = []
+        lidar2camera_list = []
+        camera_intrinsics_list = []
+
         for camera_name in self.camera_names:
             img_filename = os.path.join(self.root_split, info['image'][camera_name]['image_path'])
             img_filenames.append(img_filename)
 
             rect = info['calib'][camera_name]['R0_rect'].astype(np.float64)
-            Trv2c = info['calib'][camera_name]['Tr_velo_to_cam'].astype(np.float64)
+            Trv2c = info['calib'][camera_name]['Tr_velo_to_cam'].astype(np.float64) # eye() ?
             P2 = info['calib'][camera_name]['P2'].astype(np.float64)
             lidar2img = np.dot(P2, rect)
 
             lidar2img_list.append(lidar2img)
+            lidar2camera_list.append(rect)
+            camera_intrinsics_list.append(P2)
 
+        lidar2img_list = np.stack(lidar2img_list, axis=0)
+        lidar2camera_list = np.stack(lidar2camera_list, axis=0)
+        camera_intrinsics_list = np.stack(camera_intrinsics_list, axis=0)
+        
         input_dict = dict(
             sample_idx=sample_idx,
             pts_filename=pts_filename,
             camera_names=self.camera_names,
             img_info=img_filenames,
-            lidar2img=lidar2img_list)
+            lidar2img=lidar2img_list,
+            lidar2camera=lidar2camera_list,
+            camera_intrinsics=camera_intrinsics_list)
 
         if not self.test_mode:
             annos = self.get_ann_info(index)
@@ -392,7 +403,7 @@ class PlusKittiDataset(KittiDataset):
         img_shape = info['image']['front_left_camera']['image_shape']
         P2 = box_preds.tensor.new_tensor(P2)
 
-        box_preds_camera = box_preds.convert_to(Box3DMode.CAM, rect @ Trv2c)
+        box_preds_camera = box_preds.convert_to(Box3DMode.CAM, rect @ Trv2c) # todo bug
 
         box_corners = box_preds_camera.corners
         box_corners_in_image = points_cam2img(box_corners, P2)
@@ -539,7 +550,8 @@ class PlusKittiDataset(KittiDataset):
         """
         result_dict = None
         from mmdet3d.core.evaluation import get_formatted_results
-        det_pcdet = self.bbox2result_pcdet(results, self.CLASSES, pklfile_prefix)
+        result_files, tmp_dir = self.format_results(results, pklfile_prefix)  # result_files: a list of all annos of each frame
+        # det_pcdet = self.bbox2result_pcdet(results, self.CLASSES, pklfile_prefix)
         if(not test_flag):
             # to pcdet format
             self.eval_cnt+=10
@@ -555,7 +567,16 @@ class PlusKittiDataset(KittiDataset):
                 gt_anno = {'gt_boxes': gt_boxes, 'name': gt_names}
                 gt_annos_pcdet.append(gt_anno)
 
-            result_str, result_dict = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, det_pcdet, eval_result_dir, eval_cnt)
+            if isinstance(result_files, dict):
+                for name, result_files_ in result_files.items():
+                    if 'img' in name:
+                        continue
+                    result_str, result_dict = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, result_files_, eval_result_dir, eval_cnt)
+                    break
+            else:
+                result_str, result_dict = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, result_files, eval_result_dir, eval_cnt)
+            
+            # result_str, result_dict = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, det_pcdet, eval_result_dir, eval_cnt)
             
             print_log('\n' + '****************pcdet eval start.*****************', logger=logger)
             print_log('\n' + result_str, logger=logger)
@@ -567,7 +588,7 @@ class PlusKittiDataset(KittiDataset):
                 with open(os.path.join(eval_result_dir, eval_file_name), 'w') as f:
                     f.write(result_str)
         if show:
-            self.save_eval_results(det_pcdet, out_dir)
+            self.save_eval_results(det_pcdet, out_dir) # todo
         return result_dict
     
     @staticmethod

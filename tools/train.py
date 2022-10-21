@@ -132,7 +132,7 @@ def main():
 
     # work_dir is determined in this priority: CLI > segment in file > filename
     current_time = "{0:%Y%m%d-%H%M%S}".format(datetime.datetime.now(tz=pytz.timezone("Asia/Chongqing")))
-    pre_path = '/mnt/intel/jupyterhub/swc/train_log/mm3d'
+    pre_path = '/mnt/intel/jupyterhub/mrb/train_log/mm3d'
     cfg.work_dir = osp.join(pre_path, osp.splitext(osp.basename(args.config))[0], current_time)
 
     if args.resume_from is not None:

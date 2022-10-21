@@ -47,7 +47,7 @@ class LoadMultiViewImageFromFiles(object):
         filename = results['img_filename']
         # img is of shape (h, w, c, num_views)
         img = np.stack(
-            [mmcv.imread(name, self.color_type) for name in filename], axis=-1)
+            [mmcv.imread(name, self.color_type) for name in filename], axis=-1) # 这里的形式是numpy，需要所有camera分辨率是一致的。
         if self.to_float32:
             img = img.astype(np.float32)
         results['filename'] = filename
@@ -706,7 +706,7 @@ class LoadAnnotations3D(LoadAnnotations):
 
 
 @PIPELINES.register_module()
-class LoadMultiCamImagesFromFile:
+class LoadMultiCamImagesFromFile: #这里是用新写的，因为img形式不一样
     """Load images of multiple cameras
 
     Args:
@@ -752,6 +752,7 @@ class LoadMultiCamImagesFromFile:
         results['img_shape'] = []
         results['ori_shape'] = []
         results['img_fields'] = ['img']
+        results['img_feature'] = []
 
         for filename in results['img_info']:
             img_bytes = self.file_client.get(filename)
@@ -760,11 +761,13 @@ class LoadMultiCamImagesFromFile:
             if self.to_float32:
                 img = img.astype(np.float32)
 
+            feature_name = filename.replace('_camera', '_camera_feature').replace('.jpg', '_0.npy')
             results['filename'].append(filename)
             results['ori_filename'].append(filename)
             results['img'].append(img)
             results['img_shape'].append(img.shape)
             results['ori_shape'].append(img.shape)
+            results['img_feature'].append(np.load(feature_name))
 
         return results
 

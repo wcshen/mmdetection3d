@@ -100,14 +100,14 @@ class LSSViewTransformer(BaseModule):
     def __init__(self,
                  grid_config,
                  input_size,
-                 downsample,
+                 feature_size,
                  in_channels,
                  out_channels,
                  accelerate=False,
                  max_voxel_points=300):
         super(LSSViewTransformer, self).__init__()
         self.create_grid_infos(**grid_config)
-        self.create_frustum(grid_config['depth'], input_size, downsample)
+        self.create_frustum(grid_config['depth'], input_size, feature_size)
         self.out_channels = out_channels
         self.depth_net = nn.Conv2d(
             in_channels, self.D + self.out_channels, kernel_size=1, padding=0)
@@ -133,7 +133,7 @@ class LSSViewTransformer(BaseModule):
         self.grid_size = torch.Tensor([(cfg[1] - cfg[0]) / cfg[2]
                                        for cfg in [x, y, z]])
 
-    def create_frustum(self, depth_cfg, input_size, downsample):
+    def create_frustum(self, depth_cfg, input_size, feature_size):
         """Generate the frustum template for each image.
 
         Args:
@@ -145,7 +145,8 @@ class LSSViewTransformer(BaseModule):
                 the feature size.
         """
         H_in, W_in = input_size
-        H_feat, W_feat = H_in // downsample, W_in // downsample
+        H_feat, W_feat = feature_size
+
         d = torch.arange(*depth_cfg, dtype=torch.float)\
             .view(-1, 1, 1).expand(-1, H_feat, W_feat)
         self.D = d.shape[0]
@@ -181,6 +182,8 @@ class LSSViewTransformer(BaseModule):
         B, N, _ = trans.shape
 
         # post-transformation
+        post_trans = torch.zeros(B,N,3).to(rots)
+        post_rots = torch.eye(3, 3).repeat(B,N,1,1).to(rots)
         # B x N x D x H x W x 3
         points = self.frustum.to(rots) - post_trans.view(B, N, 1, 1, 1, 3)
         points = torch.inverse(post_rots).view(B, N, 1, 1, 1, 3, 3)\
@@ -222,7 +225,7 @@ class LSSViewTransformer(BaseModule):
                 self.grid_interval.to(coor))
         coor = coor.long().view(num_points, 3)
         batch_idx = torch.range(0, B-1).reshape(B, 1).\
-            expand(B, num_points // B).view(num_points, 1).to(coor)
+            expand(B, num_points // B).reshape(num_points, 1).to(coor)
         coor = torch.cat((coor, batch_idx), 1)
 
         # filter out points that are outside box
@@ -329,7 +332,7 @@ class LSSViewTransformer(BaseModule):
         final = torch.cat(final.unbind(dim=2), 1)
         return final
 
-    def forward(self, input):
+    def forward(self, img_feats, img_metas, lidar2img, lidar2camera, camera_intrinsics):
         """Transform image-view feature into bird-eye-view feature.
 
         Args:
@@ -339,12 +342,17 @@ class LSSViewTransformer(BaseModule):
         Returns:
             torch.tensor: Bird-eye-view feature in shape (B, C, H_BEV, W_BEV)
         """
-        x = input[0]
+        x = img_feats
         B, N, C, H, W = x.shape
         x = x.view(B * N, C, H, W)
         x = self.depth_net(x)
         depth = x[:, :self.D].softmax(dim=1)
         tran_feat = x[:, self.D:(self.D + self.out_channels)]
+
+        camera2lidar = torch.inverse(lidar2camera)
+        rots = camera2lidar[..., :3, :3]
+        trans = camera2lidar[..., :3, 3]
+        intrins = camera_intrinsics[..., :3, :3]
 
         # Lift
         volume = depth.unsqueeze(1) * tran_feat.unsqueeze(2)
@@ -358,6 +366,6 @@ class LSSViewTransformer(BaseModule):
                 self.init_acceleration(coor, volume)
             bev_feat = self.voxel_pooling_accelerated(volume)
         else:
-            coor = self.get_lidar_coor(*input[1:])
+            coor = self.get_lidar_coor(rots, trans, intrins, None, None)
             bev_feat = self.voxel_pooling(coor, volume)
         return bev_feat
