@@ -27,7 +27,6 @@ model = dict(
         style='caffe'),
     img_neck=dict(type='LSSViewTransformer',
         grid_config=grid_config,
-        input_size=(540, 960), #todo
         feature_size=(104, 200),
         in_channels=64,
         out_channels=64,

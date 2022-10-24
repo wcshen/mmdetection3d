@@ -99,7 +99,6 @@ class LSSViewTransformer(BaseModule):
 
     def __init__(self,
                  grid_config,
-                 input_size,
                  feature_size,
                  in_channels,
                  out_channels,
@@ -107,7 +106,12 @@ class LSSViewTransformer(BaseModule):
                  max_voxel_points=300):
         super(LSSViewTransformer, self).__init__()
         self.create_grid_infos(**grid_config)
-        self.create_frustum(grid_config['depth'], input_size, feature_size)
+        self.grid_config = grid_config
+        self.feature_size = feature_size
+        
+        self.d = torch.arange(*grid_config['depth'], dtype=torch.float)\
+            .view(-1, 1, 1).expand(-1, feature_size[0], feature_size[1])
+        self.D = self.d.shape[0]
         self.out_channels = out_channels
         self.depth_net = nn.Conv2d(
             in_channels, self.D + self.out_channels, kernel_size=1, padding=0)
@@ -147,18 +151,15 @@ class LSSViewTransformer(BaseModule):
         H_in, W_in = input_size
         H_feat, W_feat = feature_size
 
-        d = torch.arange(*depth_cfg, dtype=torch.float)\
-            .view(-1, 1, 1).expand(-1, H_feat, W_feat)
-        self.D = d.shape[0]
         x = torch.linspace(0, W_in - 1, W_feat,  dtype=torch.float)\
             .view(1, 1, W_feat).expand(self.D, H_feat, W_feat)
         y = torch.linspace(0, H_in - 1, H_feat,  dtype=torch.float)\
             .view(1, H_feat, 1).expand(self.D, H_feat, W_feat)
 
         # D x H x W x 3
-        self.frustum = torch.stack((x, y, d), -1)
+        return torch.stack((x, y, self.d), -1)
 
-    def get_lidar_coor(self, rots, trans, cam2imgs, post_rots, post_trans):
+    def get_lidar_coor(self, rots, trans, cam2imgs, post_rots, post_trans, img_metas):
         """Calculate the locations of the frustum points in the lidar
         coordinate system.
 
@@ -185,7 +186,16 @@ class LSSViewTransformer(BaseModule):
         post_trans = torch.zeros(B,N,3).to(rots)
         post_rots = torch.eye(3, 3).repeat(B,N,1,1).to(rots)
         # B x N x D x H x W x 3
-        points = self.frustum.to(rots) - post_trans.view(B, N, 1, 1, 1, 3)
+        frustums = []
+        for i in range(B):
+            single_frustums=[]
+            for img_shape in img_metas[i]['img_shape']: # 多个camera
+                single_frustum = self.create_frustum(self.grid_config['depth'], img_shape[0:2], self.feature_size)
+                single_frustums.append(single_frustum)
+            frustums.append(torch.stack(single_frustums))
+
+        frustum = torch.stack(frustums)
+        points = frustum.to(rots) - post_trans.view(B, N, 1, 1, 1, 3)
         points = torch.inverse(post_rots).view(B, N, 1, 1, 1, 3, 3)\
             .matmul(points.unsqueeze(-1))
 
@@ -366,6 +376,6 @@ class LSSViewTransformer(BaseModule):
                 self.init_acceleration(coor, volume)
             bev_feat = self.voxel_pooling_accelerated(volume)
         else:
-            coor = self.get_lidar_coor(rots, trans, intrins, None, None)
+            coor = self.get_lidar_coor(rots, trans, intrins, None, None, img_metas)
             bev_feat = self.voxel_pooling(coor, volume)
         return bev_feat
