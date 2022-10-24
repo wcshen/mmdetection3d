@@ -4,15 +4,15 @@ import torch
 from mmcv.runner import force_fp32
 from torch import nn
 
-from mmdet3d.ops import bev_pool
+from mmdet3d.ops.bev_pool import bev_pool
 
 __all__ = ["BaseTransform", "BaseDepthTransform"]
 
 
 def gen_dx_bx(xbound, ybound, zbound):
-    dx = torch.Tensor([row[2] for row in [xbound, ybound, zbound]])
+    dx = torch.Tensor([row[2] for row in [xbound, ybound, zbound]]) # grid间隔
     bx = torch.Tensor([row[0] + row[2] / 2.0 for row in [xbound, ybound, zbound]])
-    nx = torch.LongTensor(
+    nx = torch.Tensor( # LongTensor will report error
         [(row[1] - row[0]) / row[2] for row in [xbound, ybound, zbound]]
     )
     return dx, bx, nx
@@ -23,7 +23,6 @@ class BaseTransform(nn.Module):
         self,
         in_channels: int,
         out_channels: int,
-        image_size: Tuple[int, int],
         feature_size: Tuple[int, int],
         xbound: Tuple[float, float, float],
         ybound: Tuple[float, float, float],
@@ -32,7 +31,6 @@ class BaseTransform(nn.Module):
     ) -> None:
         super().__init__()
         self.in_channels = in_channels
-        self.image_size = image_size
         self.feature_size = feature_size
         self.xbound = xbound
         self.ybound = ybound
@@ -45,15 +43,16 @@ class BaseTransform(nn.Module):
         self.nx = nn.Parameter(nx, requires_grad=False) # [360, 360,   1]
 
         self.C = out_channels
-        self.frustum = self.create_frustum() # torch.Size([118, 32, 88, 3])
-        self.D = self.frustum.shape[0] # 118 x 32 x 88 x 3
+        
+        self.d = torch.arange(*self.dbound, dtype=torch.float)\
+            .view(-1, 1, 1).expand(-1, feature_size[0], feature_size[1])
+        self.D = self.d.shape[0]
         self.fp16_enabled = False
 
     @force_fp32()
-    def create_frustum(self):
-        iH, iW = self.image_size # 256x704
+    def create_frustum(self, img_size):
         fH, fW = self.feature_size #32x88
-
+        iH, iW = img_size[0:2]
         ds = (
             torch.arange(*self.dbound, dtype=torch.float) # 1 60 0.5
             .view(-1, 1, 1)
@@ -77,56 +76,44 @@ class BaseTransform(nn.Module):
 
     @force_fp32()
     def get_geometry(
-        self,
-        rots,
-        trans,
-        intrins,
-        post_rots,
-        post_trans,
-        lidar2ego_rots,
-        lidar2ego_trans,
-        **kwargs,
-    ):
+        self, rots, trans, cam2imgs, post_rots, post_trans, img_metas):
         B, N, _ = trans.shape
-        # undo post-transformation
+
+        # post-transformation
+        post_trans = torch.zeros(B,N,3).to(rots)
+        post_rots = torch.eye(3, 3).repeat(B,N,1,1).to(rots)
         # B x N x D x H x W x 3
-        points = self.frustum - post_trans.view(B, N, 1, 1, 1, 3) #如果做了2D的图像增强，则需要还原回来，一个trans平移，一个rots旋转
-        points = (
-            torch.inverse(post_rots)
-            .view(B, N, 1, 1, 1, 3, 3)
+        frustums = []
+        for i in range(B):
+            single_frustums=[]
+            for img_shape in img_metas[i]['img_shape']: # 多个camera
+                single_frustum = self.create_frustum(img_shape[0:2])
+                single_frustums.append(single_frustum)
+            frustums.append(torch.stack(single_frustums))
+
+        frustum = torch.stack(frustums)
+        points = frustum.to(rots) - post_trans.view(B, N, 1, 1, 1, 3)
+        points = torch.inverse(post_rots).view(B, N, 1, 1, 1, 3, 3)\
             .matmul(points.unsqueeze(-1))
-        )
+
         # cam_to_ego
         points = torch.cat(
-            (
-                points[:, :, :, :, :, :2] * points[:, :, :, :, :, 2:3],
-                points[:, :, :, :, :, 2:3],
-            ),
-            5, # 深度*feature
-        )
-        combine = rots.matmul(torch.inverse(intrins))
-        points = combine.view(B, N, 1, 1, 1, 3, 3).matmul(points).squeeze(-1) #反投影到camera视锥3D torch.Size([1, 6, 118, 32, 88, 3])
+            (points[..., :2, :] * points[..., 2:3, :], points[..., 2:3, :]), 5)
+        combine = rots.matmul(torch.inverse(cam2imgs))
+        points = combine.view(B, N, 1, 1, 1, 3, 3).matmul(points).squeeze(-1)
         points += trans.view(B, N, 1, 1, 1, 3)
-        # ego_to_lidar
-        points -= lidar2ego_trans.view(B, 1, 1, 1, 1, 3)
-        points = (
-            torch.inverse(lidar2ego_rots)
-            .view(B, 1, 1, 1, 1, 3, 3)
-            .matmul(points.unsqueeze(-1))
-            .squeeze(-1)
-        )
 
-        if "extra_rots" in kwargs:
-            extra_rots = kwargs["extra_rots"]
-            points = (
-                extra_rots.view(B, 1, 1, 1, 1, 3, 3)
-                .repeat(1, N, 1, 1, 1, 1, 1)
-                .matmul(points.unsqueeze(-1))
-                .squeeze(-1)
-            )
-        if "extra_trans" in kwargs:
-            extra_trans = kwargs["extra_trans"]
-            points += extra_trans.view(B, 1, 1, 1, 1, 3).repeat(1, N, 1, 1, 1, 1)
+        # if "extra_rots" in kwargs:  # todo
+        #     extra_rots = kwargs["extra_rots"]
+        #     points = (
+        #         extra_rots.view(B, 1, 1, 1, 1, 3, 3)
+        #         .repeat(1, N, 1, 1, 1, 1, 1)
+        #         .matmul(points.unsqueeze(-1))
+        #         .squeeze(-1)
+        #     )
+        # if "extra_trans" in kwargs:
+        #     extra_trans = kwargs["extra_trans"]
+        #     points += extra_trans.view(B, 1, 1, 1, 1, 3).repeat(1, N, 1, 1, 1, 1)
 
         return points #torch.Size([1, 6, 118, 32, 88, 3])
 
@@ -173,42 +160,16 @@ class BaseTransform(nn.Module):
 
     @force_fp32()
     def forward(
-        self,
-        img,
-        points,
-        camera2ego,
-        lidar2ego,
-        lidar2camera,
-        lidar2image,
-        camera_intrinsics,
-        img_aug_matrix,
-        lidar_aug_matrix,
-        metas=None,
-        **kwargs,
-    ):
-        rots = camera2ego[..., :3, :3]
-        trans = camera2ego[..., :3, 3]
+        self, img_feats, img_metas, lidar2img, lidar2camera, camera_intrinsics):
+        
+        camera2lidar = torch.inverse(lidar2camera)
+        rots = camera2lidar[..., :3, :3]
+        trans = camera2lidar[..., :3, 3]
         intrins = camera_intrinsics[..., :3, :3]
-        post_rots = img_aug_matrix[..., :3, :3]
-        post_trans = img_aug_matrix[..., :3, 3]
-        lidar2ego_rots = lidar2ego[..., :3, :3]
-        lidar2ego_trans = lidar2ego[..., :3, 3]
-        extra_rots = lidar_aug_matrix[..., :3, :3]
-        extra_trans = lidar_aug_matrix[..., :3, 3]
 
-        geom = self.get_geometry(
-            rots,
-            trans,
-            intrins,
-            post_rots,
-            post_trans,
-            lidar2ego_rots,
-            lidar2ego_trans,
-            extra_rots=extra_rots,
-            extra_trans=extra_trans
-        )
+        geom = self.get_geometry(rots, trans, intrins, None, None, img_metas)
 
-        x = self.get_cam_feats(img)
+        x = self.get_cam_feats(img_feats)
         x = self.bev_pool(geom, x)
         return x
 

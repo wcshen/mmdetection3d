@@ -3,20 +3,19 @@ from typing import Tuple
 from mmcv.runner import force_fp32
 from torch import nn
 
-from mmdet3d.models.builder import VTRANSFORMS
+from mmdet3d.models.builder import NECKS
 
 from .base import BaseTransform
 
 __all__ = ["LSSTransform"]
 
 
-@VTRANSFORMS.register_module()
+@NECKS.register_module()
 class LSSTransform(BaseTransform):
     def __init__(
         self,
         in_channels: int,
         out_channels: int,
-        image_size: Tuple[int, int],
         feature_size: Tuple[int, int],
         xbound: Tuple[float, float, float],
         ybound: Tuple[float, float, float],
@@ -27,7 +26,6 @@ class LSSTransform(BaseTransform):
         super().__init__(
             in_channels=in_channels,
             out_channels=out_channels,
-            image_size=image_size,
             feature_size=feature_size,
             xbound=xbound,
             ybound=ybound,

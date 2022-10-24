@@ -93,5 +93,5 @@ def bev_pool(feats, coords, B, D, H, W):
     feats, coords, ranks = feats[indices], coords[indices], ranks[indices]
 
     x = QuickCumsumCuda.apply(feats, coords, ranks, B, D, H, W)
-    x = x.permute(0, 4, 1, 2, 3).contiguous()
+    x = x.permute(0, 4, 1, 3, 2).contiguous() # to confirm
     return x

@@ -5,8 +5,11 @@ from .imvoxel_neck import OutdoorImVoxelNeck
 from .pointnet2_fp_neck import PointNetFPNeck
 from .second_fpn import SECONDFPN
 from .view_transformer import LSSViewTransformer
+from ..vtransforms.lss import LSSTransform
+from ..vtransforms.depth_lss import DepthLSSTransform
 
 __all__ = [
     'FPN', 'SECONDFPN', 'OutdoorImVoxelNeck', 'PointNetFPNeck', 'DLANeck',
-    'LSSViewTransformer'
+    'LSSViewTransformer',
+    'LSSTransform', 'DepthLSSTransform'
 ]
