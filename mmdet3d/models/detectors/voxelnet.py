@@ -46,7 +46,7 @@ class VoxelNet(SingleStage3DDetector):
         x = self.backbone(x)
         if self.with_neck:
             x = self.neck(x)
-        return x, voxel_features, 
+        return x
 
     @torch.no_grad()
     @force_fp32()
