@@ -13,8 +13,12 @@ class BEVFusion(MVXTwoStageDetector):
 
     def __init__(self, **kwargs):
         super(BEVFusion, self).__init__(**kwargs)
+        self.use_offline_img_feat = True
+        self.use_Cam = True
+        self.use_LiDAR = True
+        self.use_Radar = False
 
-    def extract_pts_feat(self, points, img_feats, img_metas): #为什么要重写呢？
+    def extract_pts_feat(self, points):
         """Extract point features."""
         if not self.with_pts_bbox:
             return None
@@ -23,8 +27,93 @@ class BEVFusion(MVXTwoStageDetector):
             voxels, num_points, coors)
         batch_size = coors[-1, 0] + 1
         pts_feats = self.pts_middle_encoder(voxel_features, coors, batch_size) # pillar VFE
-        fused_feats = torch.cat((img_feats, pts_feats), 1) # bev fusion
+
+        return pts_feats
+    
+    def forward_train(self,
+                      points=None,
+                      img_metas=None,
+                      gt_bboxes_3d=None,
+                      gt_labels_3d=None,
+                      gt_labels=None,
+                      gt_bboxes=None,
+                      img=None,
+                      img_feature=None,
+                      lidar2img=None,
+                      lidar2camera=None, 
+                      camera_intrinsics=None,
+                      radar=None,
+                      proposals=None,
+                      gt_bboxes_ignore=None,
+                      img_depth=None,
+                      img_mask=None):
+   
+        # extract feat
+        if self.use_Cam:
+            img_feats = self.extract_img_feat(img, img_feature, lidar2img, lidar2camera, camera_intrinsics, img_metas)
+        else:
+            img_feats = None
+        
+        if self.use_LiDAR:
+            pts_feats = self.extract_pts_feat(points)
+        else:
+            pts_feats = None
+        
+        if self.use_Radar:
+            rad_feats = self.radar_encoder(radar)
+        else:
+            rad_feats = None
+        
+        # calculate loss
+        losses = dict()
+        loss_fused = self.forward_mdfs_train(pts_feats, img_feats, rad_feats, gt_bboxes_3d,
+                                            gt_labels_3d, img_metas,
+                                            gt_bboxes_ignore)
+        losses.update(loss_fused)
+        return losses    
+    
+    def forward_mdfs_train(self,
+                          pts_feats,
+                          img_feats,
+                          rad_feats,
+                          gt_bboxes_3d,
+                          gt_labels_3d,
+                          img_metas,
+                          gt_bboxes_ignore=None):
+        
+         # featrue bev fusion
+        fused_feats = torch.cat((img_feats, pts_feats), 1)
+        
         x = self.pts_backbone(fused_feats) # second FPN
         if self.with_pts_neck:
             x = self.pts_neck(x)
-        return x
+        
+        outs = self.pts_bbox_head(x)
+        loss_inputs = outs + (gt_bboxes_3d, gt_labels_3d, img_metas)
+        losses = self.pts_bbox_head.loss(
+            *loss_inputs, gt_bboxes_ignore=gt_bboxes_ignore)
+        return losses    
+
+    def extract_img_feat(self, img, offline_img_feat, lidar2img, lidar2camera, camera_intrinsics, img_metas):
+        """Extract features of images."""
+        if self.use_offline_img_feat:
+            img_feats = offline_img_feat.squeeze(2)
+        else:
+            if self.with_img_backbone and img is not None:
+                # input_shape = img.shape[-2:]
+                # # update real input shape of each single img
+                # for img_meta in img_metas:
+                #     img_meta.update(input_shape=input_shape)
+                if img.dim() == 5 and img.size(0) == 1:
+                    img.squeeze_()
+                elif img.dim() == 5 and img.size(0) > 1:
+                    B, N, C, H, W = img.size()
+                    img = img.view(B * N, C, H, W)
+                img_feats = self.img_backbone(img)
+            else:
+                return None
+        
+        if self.with_img_neck:
+            img_feats = self.img_neck(img_feats, img_metas, lidar2img, lidar2camera, camera_intrinsics)
+        return img_feats
+    
