@@ -5,6 +5,7 @@ from mmcv.runner import force_fp32
 from torch import nn
 
 from mmdet3d.ops.bev_pool import bev_pool
+from mmdet3d.models import apply_3d_transformation
 
 __all__ = ["BaseTransform", "BaseDepthTransform"]
 
@@ -76,7 +77,7 @@ class BaseTransform(nn.Module):
 
     @force_fp32()
     def get_geometry(
-        self, rots, trans, cam2imgs, post_rots, post_trans, img_metas):
+        self, rots, trans, cam2imgs, post_rots, post_trans, img_metas, **kwargs):
         B, N, _ = trans.shape
 
         # post-transformation
@@ -103,6 +104,14 @@ class BaseTransform(nn.Module):
         points = combine.view(B, N, 1, 1, 1, 3, 3).matmul(points).squeeze(-1)
         points += trans.view(B, N, 1, 1, 1, 3)
 
+        raw_points_shape = points.shape[1:]
+        new_points = []
+        for i in range(B):
+            x = apply_3d_transformation(points[i].view(-1, 3), 'LIDAR', img_metas[i], reverse=False)
+            x = x.view(raw_points_shape)
+            new_points.append(x)
+        points = torch.stack(new_points)
+        
         # if "extra_rots" in kwargs:  # todo
         #     extra_rots = kwargs["extra_rots"]
         #     points = (
@@ -160,14 +169,14 @@ class BaseTransform(nn.Module):
 
     @force_fp32()
     def forward(
-        self, img_feats, img_metas, lidar2img, lidar2camera, camera_intrinsics):
+        self, img_feats, img_metas, lidar2img, lidar2camera, camera_intrinsics, **kwargs):
         
         camera2lidar = torch.inverse(lidar2camera)
         rots = camera2lidar[..., :3, :3]
         trans = camera2lidar[..., :3, 3]
         intrins = camera_intrinsics[..., :3, :3]
 
-        geom = self.get_geometry(rots, trans, intrins, None, None, img_metas)
+        geom = self.get_geometry(rots, trans, intrins, None, None, img_metas, **kwargs)
 
         x = self.get_cam_feats(img_feats)
         x = self.bev_pool(geom, x)

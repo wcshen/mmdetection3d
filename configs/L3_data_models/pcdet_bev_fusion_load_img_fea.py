@@ -173,16 +173,17 @@ train_pipeline = [
     # dict(type='ObjectSample', db_sampler=db_sampler, use_ground_plane=True),
     dict(type='LoadMultiCamImagesFromFile', to_float32=True),
     # dict(type='PaintPointsWithImageFeature', used_cameras=used_cameras, drop_camera_prob=100),
-    # dict(type='RandomFlipLidarOnly', flip_ratio_bev_horizontal=0.5),
-    # dict(
-    #     type='GlobalRotScaleTrans',
-    #     rot_range=[-0.4, 0.4],
-    #     scale_ratio_range=[0.95, 1.05]),
+    dict(type='RandomFlipLidarOnly', flip_ratio_bev_horizontal=0.5),
+    dict(
+        type='GlobalRotScaleTrans',
+        rot_range=[-0.4, 0.4],
+        scale_ratio_range=[0.95, 1.05]),
     dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='PointShuffle'),
     dict(type='DefaultFormatBundle3D', class_names=class_names),
-    dict(type='Collect3D', keys=['points', 'img', 'gt_bboxes_3d', 'gt_labels_3d'])
+    dict(type='Collect3D', keys=['points', 'img', 'gt_bboxes_3d', 'gt_labels_3d', 
+                                 'img_feature', 'lidar2img', 'lidar2camera', 'camera_intrinsics'])
 ]
 
 test_pipeline = [
