@@ -133,7 +133,10 @@ def main():
     # work_dir is determined in this priority: CLI > segment in file > filename
     current_time = "{0:%Y%m%d-%H%M%S}".format(datetime.datetime.now(tz=pytz.timezone("Asia/Chongqing")))
     pre_path = '/mnt/intel/jupyterhub/swc/train_log/mm3d'
-    cfg.work_dir = osp.join(pre_path, osp.splitext(osp.basename(args.config))[0], current_time)
+    data_name = osp.splitext(args.config)[0].split('/')[1]
+    exp_name = osp.splitext(os.path.basename(args.config))[0].split('_')[0]
+    # mm3d/L4/pointpillars/single_head/cfg/time
+    cfg.work_dir = osp.join(pre_path, data_name, exp_name, cfg.extra_tag, osp.splitext(osp.basename(args.config))[0], current_time)
 
     if args.resume_from is not None:
         cfg.resume_from = args.resume_from
@@ -228,11 +231,7 @@ def main():
     datasets = [build_dataset(cfg.data.train)]
     if len(cfg.workflow) == 2:
         val_dataset = copy.deepcopy(cfg.data.val)
-        # in case we use a dataset wrapper
-        if 'dataset' in cfg.data.train:
-            val_dataset.pipeline = cfg.data.train.dataset.pipeline
-        else:
-            val_dataset.pipeline = cfg.data.train.pipeline
+        val_dataset.pipeline = cfg.train_pipeline
         # set test_mode=False here in deep copied config
         # which do not affect AP/AR calculation later
         # refer to https://mmdetection3d.readthedocs.io/en/latest/tutorials/customize_runtime.html#customize-workflow  # noqa

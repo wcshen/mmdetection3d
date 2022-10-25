@@ -1,11 +1,11 @@
 _base_ = [
     '../../_base_/schedules/cyclic_40e.py', '../../_base_/default_runtime.py'
 ]
-
+extra_tag='single_head_wo_tele_w_sync_bn'
 # model settings
 voxel_size = [0.32, 0.32, 8]
 point_cloud_range = [-50, -51.2, -2, 154.8, 51.2, 6]
-
+use_sync_bn=True
 model = dict(
     type='VoxelNet',
     voxel_layer=dict(
@@ -16,24 +16,23 @@ model = dict(
     ),
     voxel_encoder=dict(
         type='PillarFeatureNet',
-        in_channels=4,
+        in_channels=68,
         feat_channels=[64],
         with_distance=False,
         voxel_size=voxel_size,
+        use_pcdet=True,
         point_cloud_range=point_cloud_range),
     middle_encoder=dict(
-        type='PointPillarsScatter', in_channels=64, output_shape=[320, 640]),
+        type='PointPillarsScatter', in_channels=64, output_shape=[80, 400]),
     backbone=dict(
-        type='SECOND',
+        type='PcdetBackbone',
         in_channels=64,
         layer_nums=[3, 5, 5],
         layer_strides=[2, 2, 2],
-        out_channels=[64, 128, 256]),
-    neck=dict(
-        type='SECONDFPN',
-        in_channels=[64, 128, 256],
+        num_filters=[64, 128, 256],
         upsample_strides=[1, 2, 4],
-        out_channels=[128, 128, 128]),
+        num_upsample_filters=[128, 128, 128],
+    ),
     bbox_head=dict(
         type='Anchor3DHead',
         num_classes=4,
@@ -44,10 +43,10 @@ model = dict(
         anchor_generator=dict(
             type='AlignedAnchor3DRangeGenerator',
             ranges=[
-                [-50, -51.2, -0.6, 154.8, 51.2, -0.6],
-                [-50, -51.2, -0.6, 154.8, 51.2, -0.6],
-                [-50, -51.2, -1.78, 154.8, 51.2, -1.78],
-                [-50, -51.2, -0.3, 154.8, 51.2, -0.3]
+                [-50, -51.2, -0.4, 154.8, 51.2, -0.4],
+                [-50, -51.2, -0.4, 154.8, 51.2, -0.4],
+                [-50, -51.2, -0.4, 154.8, 51.2, -0.4],
+                [-50, -51.2, -0.6, 154.8, 51.2, -0.6]
             ],
             sizes=[[0.8, 0.6, 1.73], # ped
                    [1.76, 0.6, 1.73], # cyclist
@@ -75,28 +74,28 @@ model = dict(
                 iou_calculator=dict(type='BboxOverlapsNearest3D'),
                 pos_iou_thr=0.5,
                 neg_iou_thr=0.35,
-                min_pos_iou=0,
+                min_pos_iou=0.2,
                 ignore_iof_thr=-1),
             dict(  # for Cyclist
                 type='MaxIoUAssigner',
                 iou_calculator=dict(type='BboxOverlapsNearest3D'),
                 pos_iou_thr=0.5,
                 neg_iou_thr=0.35,
-                min_pos_iou=0,
+                min_pos_iou=0.2,
                 ignore_iof_thr=-1),
             dict(  # for Car
                 type='MaxIoUAssigner',
                 iou_calculator=dict(type='BboxOverlapsNearest3D'),
                 pos_iou_thr=0.6,
                 neg_iou_thr=0.45,
-                min_pos_iou=0,
+                min_pos_iou=0.2,
                 ignore_iof_thr=-1),
             dict(  # for Truck
                 type='MaxIoUAssigner',
                 iou_calculator=dict(type='BboxOverlapsNearest3D'),
                 pos_iou_thr=0.55,
                 neg_iou_thr=0.4,
-                min_pos_iou=0,
+                min_pos_iou=0.2,
                 ignore_iof_thr=-1),
         ],
         allowed_border=0,
@@ -106,15 +105,20 @@ model = dict(
         use_rotate_nms=True,
         nms_across_levels=False,
         nms_thr=0.01,
-        score_thr=0.3,
+        score_thr=0.1,
         min_bbox_size=0,
         nms_pre=4096,
         max_num=500))
 
 # dataset settings
 dataset_type = 'PlusKittiDataset'
-data_root = '/mnt/intel/jupyterhub/swc/datasets/pc_label_trainval/CN_L4_origin_data/'
-benchmark_root = '/mnt/intel/jupyterhub/swc/datasets/pc_label_trainval/CN_L4_origin_benchmark/'
+data_root = '/mnt/intel/jupyterhub/swc/datasets/L4_extracted_data/CN_L4_origin_data/'
+hard_case_data = '/mnt/intel/jupyterhub/swc/datasets/L4_extracted_data/hard_case_origin_data/'
+side_vehicle_data = '/mnt/intel/jupyterhub/swc/datasets/L4_extracted_data/side_vehicle_origin_data/'
+under_tree_data = '/mnt/intel/jupyterhub/swc/datasets/L4_extracted_data/under_tree_origin_data/'
+
+benchmark_root = '/mnt/intel/jupyterhub/swc/datasets/L4_extracted_data/CN_L4_origin_benchmark/'
+
 class_names = ['Pedestrian', 'Cyclist', 'Car', 'Truck']
 input_modality = dict(use_lidar=True, use_camera=False)
 
@@ -211,13 +215,10 @@ eval_pipeline = [
     dict(type='Collect3D', keys=['points'])
 ]
 
-data = dict(
-    samples_per_gpu=4,
-    workers_per_gpu=4,
-    train=dict(
-        type='RepeatDataset',
-        times=2,
-        dataset=dict(
+concat_train_data = dict(
+    type='ConcatDataset',
+    datasets=[
+        dict(
             type=dataset_type,
             data_root=data_root,
             ann_file=data_root + 'Kitti_L4_data_mm3d_infos_train.pkl',
@@ -228,10 +229,61 @@ data = dict(
             classes=class_names,
             test_mode=False,
             pcd_limit_range=point_cloud_range,
-            # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
-            # and box_type_3d='Depth' in sunrgbd and scannet dataset.
             box_type_3d='LiDAR',
-            file_client_args=file_client_args)),
+            file_client_args=file_client_args
+        ),
+        dict(
+            type=dataset_type,
+            data_root=hard_case_data,
+            ann_file=hard_case_data + 'Kitti_L4_data_mm3d_infos_train.pkl',
+            split='training',
+            pts_prefix='pointcloud',
+            pipeline=train_pipeline,
+            modality=input_modality,
+            classes=class_names,
+            test_mode=False,
+            pcd_limit_range=point_cloud_range,
+            box_type_3d='LiDAR',
+            file_client_args=file_client_args
+        ),
+        dict(
+            type=dataset_type,
+            data_root=side_vehicle_data,
+            ann_file=side_vehicle_data + 'Kitti_L4_data_mm3d_infos_train.pkl',
+            split='training',
+            pts_prefix='pointcloud',
+            pipeline=train_pipeline,
+            modality=input_modality,
+            classes=class_names,
+            test_mode=False,
+            pcd_limit_range=point_cloud_range,
+            box_type_3d='LiDAR',
+            file_client_args=file_client_args
+        ),
+        dict(
+            type=dataset_type,
+            data_root=under_tree_data,
+            ann_file=under_tree_data + 'Kitti_L4_data_mm3d_infos_train.pkl',
+            split='training',
+            pts_prefix='pointcloud',
+            pipeline=train_pipeline,
+            modality=input_modality,
+            classes=class_names,
+            test_mode=False,
+            pcd_limit_range=point_cloud_range,
+            box_type_3d='LiDAR',
+            file_client_args=file_client_args
+        ),
+    ]
+)
+
+data = dict(
+    samples_per_gpu=4,
+    workers_per_gpu=4,
+    train=dict(
+        type='RepeatDataset',
+        times=2,
+        dataset=concat_train_data),
     val=dict(
         type=dataset_type,
         data_root=data_root,
@@ -262,19 +314,13 @@ data = dict(
 
 # In practice PointPillars also uses a different schedule
 # optimizer
-lr = 0.001
+lr = 0.0004
 optimizer = dict(lr=lr)
 # max_norm=35 is slightly better than 10 for PointPillars in the earlier
 # development of the codebase thus we keep the setting. But we does not
 # specifically tune this parameter.
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
-lr_config = dict(
-    policy='cyclic',
-    target_ratio=(10, 1e-3),
-    cyclic_times=1,
-    step_ratio_up=0.4,
-)
-runner = dict(max_epochs=100)
+runner = dict(max_epochs=80)
 
 # Use evaluation interval=2 reduce the number of evaluation timese
 evaluation = dict(interval=10, pipeline=eval_pipeline)
