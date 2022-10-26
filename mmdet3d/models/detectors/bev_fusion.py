@@ -5,7 +5,8 @@ from torch.nn import functional as F
 
 from ..builder import DETECTORS
 from .mvx_two_stage import MVXTwoStageDetector
-
+from mmdet3d.core import (Box3DMode, Coord3DMode, bbox3d2result,
+                          merge_aug_bboxes_3d, show_result)
 
 @DETECTORS.register_module()
 class BEVFusion(MVXTwoStageDetector):
@@ -30,6 +31,35 @@ class BEVFusion(MVXTwoStageDetector):
 
         return pts_feats
     
+    def extract_feat(self, points, img, img_feature, lidar2img, lidar2camera, camera_intrinsics, radar, img_metas):
+        if self.use_Cam:
+            img_feats = self.extract_img_feat(img, img_feature, lidar2img, lidar2camera, camera_intrinsics, img_metas)
+        else:
+            img_feats = None
+        
+        if self.use_LiDAR:
+            pts_feats = self.extract_pts_feat(points)
+        else:
+            pts_feats = None
+        
+        if self.use_Radar:
+            rad_feats = self.radar_encoder(radar)
+        else:
+            rad_feats = None
+        
+        return (img_feats, pts_feats, rad_feats)
+    
+    def forward_outs(self, pts_feats, img_feats, rad_feats):
+        # featrue bev fusion
+        fused_feats = torch.cat((img_feats, pts_feats), 1)
+        
+        x = self.pts_backbone(fused_feats) # second FPN
+        if self.with_pts_neck:
+            x = self.pts_neck(x)
+        
+        outs = self.pts_bbox_head(x)
+        return outs
+    
     def forward_train(self,
                       points=None,
                       img_metas=None,
@@ -49,21 +79,7 @@ class BEVFusion(MVXTwoStageDetector):
                       img_mask=None):
    
         # extract feat
-        if self.use_Cam:
-            img_feats = self.extract_img_feat(img, img_feature, lidar2img, lidar2camera, camera_intrinsics, img_metas)
-        else:
-            img_feats = None
-        
-        if self.use_LiDAR:
-            pts_feats = self.extract_pts_feat(points)
-        else:
-            pts_feats = None
-        
-        if self.use_Radar:
-            rad_feats = self.radar_encoder(radar)
-        else:
-            rad_feats = None
-        
+        img_feats, pts_feats, rad_feats = self.extract_feat(points, img, img_feature, lidar2img, lidar2camera, camera_intrinsics, radar, img_metas)
         # calculate loss
         losses = dict()
         loss_fused = self.forward_mdfs_train(pts_feats, img_feats, rad_feats, gt_bboxes_3d,
@@ -80,15 +96,8 @@ class BEVFusion(MVXTwoStageDetector):
                           gt_labels_3d,
                           img_metas,
                           gt_bboxes_ignore=None):
+        outs = self.forward_outs(pts_feats, img_feats, rad_feats)
         
-         # featrue bev fusion
-        fused_feats = torch.cat((img_feats, pts_feats), 1)
-        
-        x = self.pts_backbone(fused_feats) # second FPN
-        if self.with_pts_neck:
-            x = self.pts_neck(x)
-        
-        outs = self.pts_bbox_head(x)
         loss_inputs = outs + (gt_bboxes_3d, gt_labels_3d, img_metas)
         losses = self.pts_bbox_head.loss(
             *loss_inputs, gt_bboxes_ignore=gt_bboxes_ignore)
@@ -116,4 +125,27 @@ class BEVFusion(MVXTwoStageDetector):
         if self.with_img_neck:
             img_feats = self.img_neck(img_feats, img_metas, lidar2img, lidar2camera, camera_intrinsics)
         return img_feats
+    
+    def simple_test(self, points, img_metas, img=None, radar=None, rescale=False, img_feature=None, lidar2img=None, lidar2camera=None, camera_intrinsics=None):
+        """Test function without augmentaiton."""
+        img_feats, pts_feats, rad_feats = self.extract_feat(points, img, img_feature, lidar2img, lidar2camera, camera_intrinsics, radar, img_metas)
+
+        bbox_list = [dict() for i in range(len(img_metas))]
+        
+        bbox_pts = self.simple_test_mdfs(
+            pts_feats, img_feats, rad_feats, img_metas, rescale=rescale)
+        for result_dict, pts_bbox in zip(bbox_list, bbox_pts):
+            result_dict['pts_bbox'] = pts_bbox
+        return bbox_list
+ 
+    def simple_test_mdfs(self, pts_feats, img_feats, rad_feats, img_metas, rescale=False):
+        """Test function of point cloud branch."""
+        outs = self.forward_outs(pts_feats, img_feats, rad_feats)
+        bbox_list = self.pts_bbox_head.get_bboxes(
+            *outs, img_metas, rescale=rescale)
+        bbox_results = [
+            bbox3d2result(bboxes, scores, labels)
+            for bboxes, scores, labels in bbox_list
+        ]
+        return bbox_results
     

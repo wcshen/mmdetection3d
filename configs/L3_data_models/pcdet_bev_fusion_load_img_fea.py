@@ -214,24 +214,8 @@ test_pipeline = [
                 type='DefaultFormatBundle3D',
                 class_names=class_names,
                 with_label=False),
-            dict(type='Collect3D', keys=['points', 'img'])
+            dict(type='Collect3D', keys=['points', 'img', 'img_feature', 'lidar2img', 'lidar2camera', 'camera_intrinsics'])
         ])
-]
-# construct a pipeline for data and gt loading in show function
-# please keep its loading function consistent with test_pipeline (e.g. client)
-eval_pipeline = [
-    dict(
-        type='LoadPointsFromFile',
-        coord_type='LIDAR',
-        load_dim=4,
-        use_dim=4,
-        point_type='float64',
-        file_client_args=file_client_args),
-    dict(
-        type='DefaultFormatBundle3D',
-        class_names=class_names,
-        with_label=False),
-    dict(type='Collect3D', keys=['points', 'img'])
 ]
 
 data = dict(
@@ -244,6 +228,7 @@ data = dict(
             type=dataset_type,
             data_root=l3_data_root,
             ann_file=l3_data_root + 'Kitti_L4_data_mm3d_infos_train.pkl',
+            # ann_file=l3_data_root + 'l4e_mini_data_train.pkl',
             split='training',
             pts_prefix='pointcloud',
             pipeline=train_pipeline,
@@ -260,6 +245,7 @@ data = dict(
         type=dataset_type,
         data_root=l3_data_root,
         ann_file=l3_data_root + 'Kitti_L4_data_mm3d_infos_val.pkl',
+        # ann_file=l3_data_root + 'l4e_mini_data_val.pkl',
         split='training',
         pts_prefix='pointcloud',
         pipeline=test_pipeline,
@@ -298,11 +284,11 @@ optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # PointPillars usually need longer schedule than second, we simply double
 # the training schedule. Do remind that since we use RepeatDataset and
 # repeat factor is 2, so we actually train 160 epochs.
-runner = dict(max_epochs=80)
+runner = dict(max_epochs=20)
 
 # Use evaluation interval=2 reduce the number of evaluation timese
-evaluation = dict(interval=10, pipeline=eval_pipeline)
-checkpoint_config = dict(interval=2)
+evaluation = dict(interval=2)
+checkpoint_config = dict(interval=1)
 workflow = [('train', 2), ('val', 1)]
 # resume_from ='/mnt/intel/jupyterhub/mrb/code/mm3d_bevfusion/train_log/mm3d/pcdet_bev_fusion/20221020-095511/epoch_4.pth'
 find_unused_parameters=True
