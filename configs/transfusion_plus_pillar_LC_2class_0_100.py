@@ -1,4 +1,4 @@
-point_cloud_range = [0, -10.0, -2.0, 100.0, 10.0, 6.0]
+point_cloud_range = [0, -50.0, -2.0, 100.0, 50.0, 6.0]
 file_client_args = dict(backend='disk')
 
 class_names = ['Car', 'Truck']
@@ -6,7 +6,11 @@ voxel_size = [0.25, 0.25, 8]
 out_size_factor = 4
 evaluation = dict(interval=1)
 dataset_type = 'PlusKittiDataset'
-data_root = 'data/L4E_origin_benchmark/'
+dataset_type = 'PlusKittiDataset'
+l4_data_root = '/home/wancheng.shen/datasets/CN_L4_origin_data/'
+l4_benchmark_root = '/home/wancheng.shen/datasets/CN_L4_origin_benchmark/'
+l3_data_root = '/mnt/intel/jupyterhub/mrb/datasets/L4E_wo_tele/L4E_origin_data/'
+l3_benchmark_root = '/mnt/intel/jupyterhub/swc/datasets/L4E_wo_tele/L4E_origin_benchmark/'
 input_modality = dict(
     use_lidar=True,
     use_camera=True,
@@ -52,6 +56,7 @@ test_pipeline = [
         use_dim=4,
         file_client_args=file_client_args,
         point_type='float64'),
+    dict(type='LoadMultiCamImagesFromFile'),
     dict(
         type='MultiScaleFlipAug3D',
         img_scale=(1333, 800),
@@ -72,16 +77,17 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    samples_per_gpu=1, # todo?
-    workers_per_gpu=1,
+    samples_per_gpu=2, # todo?
+    workers_per_gpu=2,
     train=dict(
         # type='CBGSDataset', # todo?
         type='RepeatDataset',
         times=2,
         dataset=dict(
             type=dataset_type,
-            data_root=data_root,
-            ann_file=data_root + '/Kitti_L4_data_mm3d_infos_trainval.pkl',
+            data_root=l3_data_root,
+            ann_file=l3_data_root + 'Kitti_L4_data_mm3d_infos_train.pkl',
+            # ann_file=l3_data_root + 'l4e_mini_data_train.pkl',
             split='training',
             pts_prefix='pointcloud',
             pipeline=train_pipeline,
@@ -91,8 +97,9 @@ data = dict(
             box_type_3d='LiDAR')),
     val=dict(
         type=dataset_type,
-        data_root=data_root,
-        ann_file=data_root + '/Kitti_L4_data_mm3d_infos_val.pkl',
+        data_root=l3_data_root,
+        ann_file=l3_data_root + 'Kitti_L4_data_mm3d_infos_val.pkl',
+        # ann_file=l3_data_root + 'l4e_mini_data_val.pkl',
         split='training',
         pts_prefix='pointcloud',
         pipeline=test_pipeline,
@@ -102,8 +109,10 @@ data = dict(
         box_type_3d='LiDAR'),
     test=dict(
         type=dataset_type,
-        data_root='data/L4E_origin_benchmark/',
-        ann_file='data/L4E_origin_benchmark/Kitti_L4_data_mm3d_infos_val.pkl',
+        data_root=l3_benchmark_root,
+        ann_file=l3_benchmark_root + 'Kitti_L4_data_mm3d_infos_val.pkl',
+        # data_root=l3_data_root,
+        # ann_file=l3_data_root + 'l4e_mini_data_test.pkl',
         split='training',
         pts_prefix='pointcloud',
         pipeline=test_pipeline,
@@ -151,7 +160,7 @@ model = dict(
         point_cloud_range=point_cloud_range,
     ),
     pts_middle_encoder=dict(
-        type='PointPillarsScatter', in_channels=64, output_shape=(80, 400) # todo
+        type='PointPillarsScatter', in_channels=64, output_shape=(400, 400) # todo
     ),
     pts_backbone=dict(
         type='SECOND',
@@ -217,7 +226,7 @@ model = dict(
             pos_weight=-1,
             gaussian_overlap=0.1,
             min_radius=2,
-            grid_size=[400, 80, 1],  # [x_len, y_len, 1] # 生成heatmap
+            grid_size=[400, 400, 1],  # [x_len, y_len, 1] # 生成heatmap
             voxel_size=voxel_size,
             out_size_factor=out_size_factor,
             code_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], # 各个loss的权重
@@ -225,7 +234,7 @@ model = dict(
     test_cfg=dict(
         pts=dict(
             dataset='nuScenes', #有影响吗？
-            grid_size=[400, 80, 1],
+            grid_size=[400, 400, 1],
             out_size_factor=out_size_factor,
             pc_range=point_cloud_range[0:2],
             voxel_size=voxel_size[:2],
@@ -243,7 +252,7 @@ momentum_config = dict(
     target_ratio=(0.8947368421052632, 1),
     cyclic_times=1,
     step_ratio_up=0.4)
-total_epochs = 80
+total_epochs = 10
 checkpoint_config = dict(interval=1)
 log_config = dict(
     interval=50,
@@ -254,5 +263,9 @@ log_level = 'INFO'
 work_dir = None
 load_from = None
 resume_from = None
-workflow = [('train', 1)]
+load_from = '/home/rongbo.ma/code/mmdetection3d_debug/work_dirs/plus_transfusion_2class_100/epoch_80.pth'
+# workflow = [('train', 1)]
+workflow = [('train', 2), ('val', 1)]
 gpu_ids = range(0, 8)
+find_unused_parameters = True
+freeze_lidar_components = True
