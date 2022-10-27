@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-CUDA_VISIBLE_DEVICES="4,5,6,7" 
+export NCCL_P2P_DISABLE=1 
+# CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7" 
 function train()
 {
     PORT=30000 \
     bash tools/dist_train.sh \
-    configs/L3_data_models/pcdet_bev_fusion.py \
-    4
+    configs/L3_data_models/pcdet_bev_fusion_load_img_fea.py \
+    8 --work-dir add_lidar_depth
 }
 
 function plot_pr_curv()

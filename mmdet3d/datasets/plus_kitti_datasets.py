@@ -204,10 +204,10 @@ class PlusKittiDataset(KittiDataset):
             img_filename = os.path.join(self.root_split, info['image'][camera_name]['image_path'])
             img_filenames.append(img_filename)
 
-            rect = info['calib'][camera_name]['R0_rect'].astype(np.float64)
-            Trv2c = info['calib'][camera_name]['Tr_velo_to_cam'].astype(np.float64) # eye() ?
-            P2 = info['calib'][camera_name]['P2'].astype(np.float64)
-            lidar2img = np.dot(P2, rect)
+            rect = info['calib'][camera_name]['R0_rect'].astype(np.float64) # 外参
+            Trv2c = info['calib'][camera_name]['Tr_velo_to_cam'].astype(np.float64) # eye() 没有用到
+            P2 = info['calib'][camera_name]['P2'].astype(np.float64) # 内参
+            lidar2img = np.dot(P2, rect) #
 
             lidar2img_list.append(lidar2img)
             lidar2camera_list.append(rect)

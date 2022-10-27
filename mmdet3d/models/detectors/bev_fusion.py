@@ -33,7 +33,7 @@ class BEVFusion(MVXTwoStageDetector):
     
     def extract_feat(self, points, img, img_feature, lidar2img, lidar2camera, camera_intrinsics, radar, img_metas):
         if self.use_Cam:
-            img_feats = self.extract_img_feat(img, img_feature, lidar2img, lidar2camera, camera_intrinsics, img_metas)
+            img_feats = self.extract_img_feat(points, img, img_feature, lidar2img, lidar2camera, camera_intrinsics, img_metas)
         else:
             img_feats = None
         
@@ -103,7 +103,7 @@ class BEVFusion(MVXTwoStageDetector):
             *loss_inputs, gt_bboxes_ignore=gt_bboxes_ignore)
         return losses    
 
-    def extract_img_feat(self, img, offline_img_feat, lidar2img, lidar2camera, camera_intrinsics, img_metas):
+    def extract_img_feat(self, points, img, offline_img_feat, lidar2img, lidar2camera, camera_intrinsics, img_metas):
         """Extract features of images."""
         if self.use_offline_img_feat:
             img_feats = offline_img_feat.squeeze(2)
@@ -123,7 +123,7 @@ class BEVFusion(MVXTwoStageDetector):
                 return None
         
         if self.with_img_neck:
-            img_feats = self.img_neck(img_feats, img_metas, lidar2img, lidar2camera, camera_intrinsics)
+            img_feats = self.img_neck(points, img_feats, img_metas, lidar2img, lidar2camera, camera_intrinsics)
         return img_feats
     
     def simple_test(self, points, img_metas, img=None, radar=None, rescale=False, img_feature=None, lidar2img=None, lidar2camera=None, camera_intrinsics=None):

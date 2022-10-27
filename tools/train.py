@@ -133,7 +133,10 @@ def main():
     # work_dir is determined in this priority: CLI > segment in file > filename
     current_time = "{0:%Y%m%d-%H%M%S}".format(datetime.datetime.now(tz=pytz.timezone("Asia/Chongqing")))
     pre_path = '/mnt/intel/jupyterhub/mrb/train_log/mm3d'
-    cfg.work_dir = osp.join(pre_path, osp.splitext(osp.basename(args.config))[0], current_time)
+    if args.work_dir is not None:
+        cfg.work_dir = osp.join(pre_path, osp.splitext(osp.basename(args.config))[0], args.work_dir + '_' + current_time)
+    else: 
+        cfg.work_dir = osp.join(pre_path, osp.splitext(osp.basename(args.config))[0], current_time)
 
     if args.resume_from is not None:
         cfg.resume_from = args.resume_from
@@ -224,7 +227,7 @@ def main():
 
     logger.info(f'Model:\n{model}')
     datasets = [build_dataset(cfg.data.train)]
-    if len(cfg.workflow) == 2:
+    if len(cfg.workflow) == 2: # 如果workflow长度是2，则把val dataset也加上
         val_dataset = copy.deepcopy(cfg.data.val)
         # in case we use a dataset wrapper
         if 'dataset' in cfg.data.train:

@@ -1,8 +1,10 @@
+from threading import currentThread
 from typing import Tuple
 
 import torch
 from mmcv.runner import force_fp32
 from torch import nn
+from torch.nn import functional as F
 
 from mmdet3d.ops.bev_pool import bev_pool
 from mmdet3d.models import apply_3d_transformation
@@ -24,6 +26,7 @@ class BaseTransform(nn.Module):
         self,
         in_channels: int,
         out_channels: int,
+        image_size: Tuple[int, int],
         feature_size: Tuple[int, int],
         xbound: Tuple[float, float, float],
         ybound: Tuple[float, float, float],
@@ -32,6 +35,7 @@ class BaseTransform(nn.Module):
     ) -> None:
         super().__init__()
         self.in_channels = in_channels
+        self.image_size = image_size
         self.feature_size = feature_size
         self.xbound = xbound
         self.ybound = ybound
@@ -186,37 +190,30 @@ class BaseTransform(nn.Module):
 class BaseDepthTransform(BaseTransform):
     @force_fp32()
     def forward(
-        self,
-        img,
-        points,
-        sensor2ego,
-        lidar2ego,
-        lidar2camera,
-        lidar2image,
-        cam_intrinsic,
-        img_aug_matrix,
-        lidar_aug_matrix,
-        metas,
-        **kwargs,
+        self, points, img_feats, img_metas, lidar2img, lidar2camera, camera_intrinsics, **kwargs
     ):
-        rots = sensor2ego[..., :3, :3]
-        trans = sensor2ego[..., :3, 3]
-        intrins = cam_intrinsic[..., :3, :3]
-        post_rots = img_aug_matrix[..., :3, :3]
-        post_trans = img_aug_matrix[..., :3, 3]
-        lidar2ego_rots = lidar2ego[..., :3, :3]
-        lidar2ego_trans = lidar2ego[..., :3, 3]
-        extra_rots = lidar_aug_matrix[..., :3, :3]
-        extra_trans = lidar_aug_matrix[..., :3, 3]
+        camera2lidar = torch.inverse(lidar2camera)
+        rots = camera2lidar[..., :3, :3]
+        trans = camera2lidar[..., :3, 3]
+        
+        intrins = camera_intrinsics[..., :3, :3]
+        # post_rots = img_aug_matrix[..., :3, :3]
+        # post_trans = img_aug_matrix[..., :3, 3]
+
+        # extra_rots = lidar_aug_matrix[..., :3, :3]
+        # extra_trans = lidar_aug_matrix[..., :3, 3]
 
         batch_size = len(points)
-        depth = torch.zeros(batch_size, 6, 1, *self.image_size).to(points[0].device)
+        num_cam = len(img_metas[0]['img_shape'])
+        depth = torch.zeros(batch_size, num_cam, 1, *self.image_size).to(points[0].device)
 
         for b in range(batch_size):
-            cur_coords = points[b][:, :3].transpose(1, 0)
-            cur_img_aug_matrix = img_aug_matrix[b]
-            cur_lidar_aug_matrix = lidar_aug_matrix[b] # not used?
-            cur_lidar2image = lidar2image[b]
+            # cur_coords = points[b][:, :3].transpose(1, 0)
+            cur_coords = apply_3d_transformation(points[b][:, :3].view(-1, 3), 'LIDAR', img_metas[b], reverse=True)
+            cur_coords = cur_coords.transpose(1, 0)
+            # cur_img_aug_matrix = img_aug_matrix[b]
+            # cur_lidar_aug_matrix = lidar_aug_matrix[b] # not used?
+            cur_lidar2image = lidar2img[b].float()
 
             # lidar2image
             cur_coords = cur_lidar2image[:, :3, :3].matmul(cur_coords) #投影到6个相机上
@@ -227,8 +224,8 @@ class BaseDepthTransform(BaseTransform):
             cur_coords[:, :2, :] /= cur_coords[:, 2:3, :] # 这都是投影到图像上的点了
 
             # imgaug
-            cur_coords = cur_img_aug_matrix[:, :3, :3].matmul(cur_coords) # todo?
-            cur_coords += cur_img_aug_matrix[:, :3, 3].reshape(-1, 3, 1)
+            # cur_coords = cur_img_aug_matrix[:, :3, :3].matmul(cur_coords) # todo?
+            # cur_coords += cur_img_aug_matrix[:, :3, 3].reshape(-1, 3, 1)
             cur_coords = cur_coords[:, :2, :].transpose(1, 2)
 
             # normalize coords for grid sample
@@ -240,21 +237,32 @@ class BaseDepthTransform(BaseTransform):
                 & (cur_coords[..., 1] < self.image_size[1])
                 & (cur_coords[..., 1] >= 0)
             )
-            for c in range(6):
+            for c in range(num_cam):
                 masked_coords = cur_coords[c, on_img[c]].long()
                 masked_dist = dist[c, on_img[c]]
                 depth[b, c, 0, masked_coords[:, 0], masked_coords[:, 1]] = masked_dist
 
-        geom = self.get_geometry(
-            rots,
-            trans,
-            intrins,
-            post_rots,
-            post_trans,
-            lidar2ego_rots,
-            lidar2ego_trans, #torch.Size([1, 6, 118, 32, 88, 3])
-        )
+        geom = self.get_geometry(rots, trans, intrins, None, None, img_metas, **kwargs) #torch.Size([1, 6, 118, 32, 88, 3])
 
-        x = self.get_cam_feats(img, depth) # img: [1, 6, 256, 32, 88]  depth: [1, 6, 1, 256, 704]  x: torch.Size([1, 6, 118, 32, 88, 80])
+        depth_resize_list = []
+        for i in range(batch_size):
+            out = self.resize_feature(self.feature_size[0]*4, self.feature_size[1]*4, depth[i])
+            depth_resize_list.append(out)
+            
+        depth = torch.stack(depth_resize_list)
+
+        x = self.get_cam_feats(img_feats, depth) # img: [1, 6, 256, 32, 88]  depth: [1, 6, 1, 256, 704]  x: torch.Size([1, 6, 118, 32, 88, 80])
         x = self.bev_pool(geom, x) # geom: [1, 6, 118, 32, 88, 3]   x: [1, 6, 118, 32, 88, 80], 118个深度离散值, 通道是80
         return x
+    
+    def resize_feature(self, out_h, out_w, in_feat):
+        new_h = torch.linspace(-1, 1, out_h).view(-1, 1).repeat(1, out_w)
+        new_w = torch.linspace(-1, 1, out_w).repeat(out_h, 1)
+        grid = torch.cat((new_h.unsqueeze(2), new_w.unsqueeze(2)), dim=2)
+        grid = grid.unsqueeze(0)
+        grid = grid.expand(in_feat.shape[0], *grid.shape[1:]).to(in_feat)
+        
+        out_feat = F.grid_sample(in_feat, grid=grid, mode='bilinear', align_corners=True)
+        
+        return out_feat
+        
