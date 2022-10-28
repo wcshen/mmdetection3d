@@ -1,7 +1,7 @@
 _base_ = [
     '../../_base_/schedules/cyclic_40e.py', '../../_base_/default_runtime.py'
 ]
-extra_tag='single_head_wo_tele_w_sync_bn'
+extra_tag='single_head_w_tele_w_sync_bn'
 # model settings
 voxel_size = [0.32, 0.32, 8]
 point_cloud_range = [-50, -51.2, -2, 154.8, 51.2, 6]
@@ -16,14 +16,14 @@ model = dict(
     ),
     voxel_encoder=dict(
         type='PillarFeatureNet',
-        in_channels=68,
+        in_channels=4,
         feat_channels=[64],
         with_distance=False,
         voxel_size=voxel_size,
         use_pcdet=True,
         point_cloud_range=point_cloud_range),
     middle_encoder=dict(
-        type='PointPillarsScatter', in_channels=64, output_shape=[80, 400]),
+        type='PointPillarsScatter', in_channels=64, output_shape=[320, 640]),
     backbone=dict(
         type='PcdetBackbone',
         in_channels=64,
@@ -150,6 +150,7 @@ train_pipeline = [
         load_dim=4,
         use_dim=4,
         point_type='float64',
+        using_tele=True,
         file_client_args=file_client_args),
     dict(
         type='LoadAnnotations3D',
@@ -176,7 +177,8 @@ test_pipeline = [
         load_dim=4,
         use_dim=4,
         file_client_args=file_client_args,
-        point_type='float64'),    
+        point_type='float64',
+        using_tele=True),    
     dict(
         type='MultiScaleFlipAug3D',
         img_scale=(1333, 800),
@@ -207,6 +209,7 @@ eval_pipeline = [
         load_dim=4,
         use_dim=4,
         point_type='float64',
+        using_tele=True,
         file_client_args=file_client_args),
     dict(
         type='DefaultFormatBundle3D',
