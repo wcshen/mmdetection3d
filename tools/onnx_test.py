@@ -143,7 +143,7 @@ def parse_args():
     parser.add_argument('--show', action='store_true', help='show results')
     parser.add_argument('--plot_result', action='store_true', help='save results')
     parser.add_argument('--plus_eval', action='store_true', help='eval one pth')
-    
+    parser.add_argument('--test_flag', action='store_true', help='test flag')
     parser.add_argument(
         '--show-dir', help='directory where results will be saved')
     parser.add_argument(
@@ -268,12 +268,14 @@ def onnx_inference(cfg, data_loader):
         e = time.time()
         t2 = (e - s) * 1000.0
         print(f"v_t: {t1:.2f} r_t: {t2:.2f} a_t: {t1+t2:.2f}")
-        cls_preds = [torch.from_numpy(rpn_out_onnx[0]).float().cuda()]
-        box_preds = [torch.from_numpy(rpn_out_onnx[1]).float().cuda()]
-        dir_cls = [torch.from_numpy(rpn_out_onnx[2]).float().cuda()]
+        cls_pred = torch.from_numpy(rpn_out_onnx[0]).permute(0,3,1,2)
+        box_pred = torch.from_numpy(rpn_out_onnx[1]).permute(0,3,1,2)
+        dir_pred = torch.from_numpy(rpn_out_onnx[2]).permute(0,3,1,2)
+        cls_preds = [cls_pred.float().cuda()]
+        box_preds = [box_pred.float().cuda()]
+        dir_cls = [dir_pred.float().cuda()]
         
         input_metas = data['img_metas'][0].data[0]
-        
         bbox_list = head.get_bboxes(cls_scores=cls_preds, 
                                     bbox_preds=box_preds, 
                                     dir_cls_preds=dir_cls, 
@@ -390,7 +392,7 @@ def main():
 
     if not distributed:
         model = MMDataParallel(model, device_ids=cfg.gpu_ids)
-        outputs = single_gpu_test(model, data_loader, False, args.show_dir)
+        # outputs = single_gpu_test(model, data_loader, False, args.show_dir)
     else:
         model = MMDistributedDataParallel(
             model.cuda(),
@@ -444,6 +446,6 @@ def main():
 
 
 if __name__ == '__main__':
-    pfe_model_file = './tools/export_onnx/pfe.onnx'
-    rpn_model_file = './tools/export_onnx/rpn.onnx'
+    pfe_model_file = './tools/export_onnx/mm3d_pps_pfe.onnx'
+    rpn_model_file = './tools/export_onnx/mm3d_pps_rpn.onnx'
     main()

@@ -301,7 +301,7 @@ class Anchor3DHead(BaseModule, AnchorTrainMixin):
                            dim=-1)
         return boxes1, boxes2
 
-    # @force_fp32(apply_to=('cls_scores', 'bbox_preds', 'dir_cls_preds'))
+    @force_fp32(apply_to=('cls_scores', 'bbox_preds', 'dir_cls_preds'))
     def loss(self,
              cls_scores,
              bbox_preds,

@@ -453,8 +453,8 @@ class PlusKittiDataset(KittiDataset):
                           class_names,
                           pklfile_prefix=None,
                           submission_prefix=None):
-        assert len(net_outputs) == len(self.data_infos), \
-            'invalid list length of network outputs'
+        # assert len(net_outputs) == len(self.data_infos), \
+        #     'invalid list length of network outputs'
         if submission_prefix is not None:
             mmcv.mkdir_or_exist(submission_prefix)
 
@@ -468,12 +468,13 @@ class PlusKittiDataset(KittiDataset):
             anno = {
                     'dt_boxes': [],
                     'name': [],
-                    'scores': []
+                    'scores': [],
             }
             if len(pred_dicts['boxes_3d']) > 0:
                 scores = pred_dicts['scores_3d']
                 box_preds_lidar = pred_dicts['boxes_3d']
                 label_preds = pred_dicts['labels_3d']
+                idxs = pred_dicts['idx']
 
                 for box_lidar, score, label in zip(
                         box_preds_lidar, scores, label_preds):
@@ -482,6 +483,7 @@ class PlusKittiDataset(KittiDataset):
                     anno['scores'].append(score)
 
                 anno = {k: np.stack(v) for k, v in anno.items()}
+                anno['idx'] = idxs
                 annos.append(anno)
             else:
                 anno = {
@@ -588,7 +590,8 @@ class PlusKittiDataset(KittiDataset):
         from .utils import plot_gt_det_cmp
         
         for i, result in enumerate(dets_pcdet):
-            data_info = self.data_infos[i]
+            idx = result['idx']
+            data_info = self.data_infos[idx]
             pts_path = data_info['point_cloud']['lidar_idx']
             file_name = f"{self.root_split}/{self.pts_prefix}/{pts_path}.bin"
             points = np.fromfile(file_name).reshape(-1, 4)
