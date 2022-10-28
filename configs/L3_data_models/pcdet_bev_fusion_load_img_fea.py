@@ -3,7 +3,7 @@ _base_ = [
 ]
 
 # model settings
-voxel_size = [0.5, 0.5, 8]
+voxel_size = [0.25, 0.25, 8]
 point_cloud_range = [0, -10, -2, 100, 10, 6]
 used_cameras=2
 
@@ -13,6 +13,11 @@ grid_config = {
     'z': [-10.0, 10.0, 20.0],
     'depth': [1.0, 100.0, 1],
 }
+bev_grid_map_size = [
+    int((grid_config['y'][1] - grid_config['y'][0]) / voxel_size[1]),
+    int((grid_config['x'][1] - grid_config['x'][0]) / voxel_size[0]),
+    ]
+
 
 model = dict(
     type='BEVFusion',
@@ -57,7 +62,7 @@ model = dict(
         use_pcdet=True,
         point_cloud_range=point_cloud_range),
     pts_middle_encoder=dict(
-        type='PointPillarsScatter', in_channels=64, output_shape=[40, 200]),
+        type='PointPillarsScatter', in_channels=64, output_shape=bev_grid_map_size),
     pts_backbone=dict(
         type='PcdetBackbone',
         in_channels=128,
@@ -285,10 +290,10 @@ optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # PointPillars usually need longer schedule than second, we simply double
 # the training schedule. Do remind that since we use RepeatDataset and
 # repeat factor is 2, so we actually train 160 epochs.
-runner = dict(max_epochs=20)
+runner = dict(max_epochs=80)
 
 # Use evaluation interval=2 reduce the number of evaluation timese
-evaluation = dict(interval=2)
+evaluation = dict(interval=10)
 checkpoint_config = dict(interval=1)
 workflow = [('train', 2), ('val', 1)]
 # resume_from ='/mnt/intel/jupyterhub/mrb/code/mm3d_bevfusion/train_log/mm3d/pcdet_bev_fusion/20221020-095511/epoch_4.pth'
