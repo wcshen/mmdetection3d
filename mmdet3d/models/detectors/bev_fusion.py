@@ -51,8 +51,14 @@ class BEVFusion(MVXTwoStageDetector):
     
     def forward_outs(self, pts_feats, img_feats, rad_feats):
         # featrue bev fusion
-        fused_feats = torch.cat((img_feats, pts_feats), 1)
-        
+        if self.use_LiDAR and self.use_Cam and not self.use_Radar:
+            fused_feats = torch.cat((img_feats, pts_feats), 1)
+        elif self.use_LiDAR and not self.use_Cam and not self.use_Radar:
+            fused_feats = pts_feats
+        elif not self.use_LiDAR and self.use_Cam and not self.use_Radar:
+            fused_feats = img_feats
+        else: # todo
+            fused_feats = torch.cat((img_feats, pts_feats, rad_feats), 1)
         x = self.pts_backbone(fused_feats) # second FPN
         if self.with_pts_neck:
             x = self.pts_neck(x)

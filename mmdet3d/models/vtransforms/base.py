@@ -173,7 +173,7 @@ class BaseTransform(nn.Module):
 
     @force_fp32()
     def forward(
-        self, img_feats, img_metas, lidar2img, lidar2camera, camera_intrinsics, **kwargs):
+        self, points, img_feats, img_metas, lidar2img, lidar2camera, camera_intrinsics, **kwargs):
         
         camera2lidar = torch.inverse(lidar2camera)
         rots = camera2lidar[..., :3, :3]
