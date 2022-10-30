@@ -12,12 +12,12 @@ from mmdet3d.core import (Box3DMode, Coord3DMode, bbox3d2result,
 class BEVFusion(MVXTwoStageDetector):
     """Multi-modality VoxelNet using Faster R-CNN and dynamic voxelization."""
 
-    def __init__(self, **kwargs):
+    def __init__(self,used_sensors=None, use_offline_img_feat=True, **kwargs):
         super(BEVFusion, self).__init__(**kwargs)
-        self.use_offline_img_feat = True
-        self.use_Cam = True
-        self.use_LiDAR = True
-        self.use_Radar = False
+        self.use_offline_img_feat = use_offline_img_feat
+        self.use_LiDAR = used_sensors.get('use_lidar', False)
+        self.use_Cam = used_sensors.get('use_camera', False)
+        self.use_Radar = used_sensors.get('use_radar', False)
 
     def extract_pts_feat(self, points):
         """Extract point features."""

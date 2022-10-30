@@ -6,7 +6,10 @@ _base_ = [
 voxel_size = [0.25, 0.25, 8]
 point_cloud_range = [0, -10, -2, 100, 10, 6]
 used_cameras=2
-
+use_offline_img_feat=True
+used_sensors = {'use_lidar': True,
+               'use_camera': True,
+               'use_radar': False}
 grid_config = {
     'x': [0, 100, voxel_size[0]],
     'y': [-10, 10, voxel_size[1]],
@@ -21,6 +24,8 @@ bev_grid_map_size = [
 
 model = dict(
     type='BEVFusion',
+    used_sensors=used_sensors,
+    use_offline_img_feat=use_offline_img_feat,
     img_backbone=dict(
         type='ResNet',
         depth=50,
