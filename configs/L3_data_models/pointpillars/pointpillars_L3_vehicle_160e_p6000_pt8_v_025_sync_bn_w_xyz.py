@@ -1,7 +1,8 @@
 _base_ = [
-    '../_base_/schedules/cyclic_40e.py', '../_base_/default_runtime.py'
+    '../../_base_/schedules/cyclic_40e.py', '../../_base_/default_runtime.py'
 ]
-
+use_sync_bn=True
+extra_tag = 'single_head_sync_bn_w_xyz'
 # model settings
 voxel_size = [0.25, 0.25, 8]
 point_cloud_range = [0, -10, -2, 100, 10, 6]
@@ -16,12 +17,13 @@ model = dict(
     ),
     voxel_encoder=dict(
         type='PillarFeatureNet',
-        in_channels=68,
+        in_channels=4,
         feat_channels=[64],
         with_distance=False,
         voxel_size=voxel_size,
         use_pcdet=True,
-        point_cloud_range=point_cloud_range),
+        point_cloud_range=point_cloud_range,
+        legacy=False),
     middle_encoder=dict(
         type='PointPillarsScatter', in_channels=64, output_shape=[80, 400]),
     backbone=dict(
@@ -43,8 +45,8 @@ model = dict(
         anchor_generator=dict(
             type='AlignedAnchor3DRangeGenerator',
             ranges=[
-                [0, -10.0, -1.78, 100.0, 10.0, -1.78],
-                [0, -10.0, -0.3, 100.0, 10.0, -0.3]
+                [0, -10.0, -0.4, 100.0, 10.0, -0.4],
+                [0, -10.0, -0.6, 100.0, 10.0, -0.6]
             ],
             sizes=[[4.63, 1.97, 1.74], # car
                    [12.5, 2.94, 3.47],  # truck
@@ -94,8 +96,6 @@ model = dict(
 
 # dataset settings
 dataset_type = 'PlusKittiDataset'
-l4_data_root = '/home/wancheng.shen/datasets/CN_L4_origin_data/'
-l4_benchmark_root = '/home/wancheng.shen/datasets/CN_L4_origin_benchmark/'
 l3_data_root = '/mnt/intel/jupyterhub/swc/datasets/L4E_wo_tele/L4E_origin_data/'
 l3_benchmark_root = '/mnt/intel/jupyterhub/swc/datasets/L4E_wo_tele/L4E_origin_benchmark/'
 
@@ -137,9 +137,7 @@ train_pipeline = [
         with_label_3d=True,
         file_client_args=file_client_args),
     # dict(type='ObjectSample', db_sampler=db_sampler, use_ground_plane=True),
-    dict(type='LoadMultiCamImagesFromFile'),
-    dict(type='PaintPointsWithImageFeature', used_cameras=1),
-    dict(type='RandomFlipLidarOnly', flip_ratio_bev_horizontal=0.5),
+    dict(type='RandomFlip3D', flip_ratio_bev_horizontal=0.5),
     dict(
         type='GlobalRotScaleTrans',
         rot_range=[-0.4, 0.4],
@@ -147,7 +145,7 @@ train_pipeline = [
     dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='PointShuffle'),
-    dict(type='DefaultFormatBundleMultiCam3D', class_names=class_names),
+    dict(type='DefaultFormatBundle3D', class_names=class_names),
     dict(type='Collect3D', keys=['points', 'gt_bboxes_3d', 'gt_labels_3d'])
 ]
 
@@ -159,9 +157,6 @@ test_pipeline = [
         use_dim=4,
         file_client_args=file_client_args,
         point_type='float64'),
-    dict(type='LoadMultiCamImagesFromFile'),
-    dict(type='PaintPointsWithImageFeature', used_cameras=1),
-    
     dict(
         type='MultiScaleFlipAug3D',
         img_scale=(1333, 800),
@@ -173,11 +168,11 @@ test_pipeline = [
                 rot_range=[0, 0],
                 scale_ratio_range=[1., 1.],
                 translation_std=[0, 0, 0]),
-            dict(type='RandomFlipLidarOnly'),
+            dict(type='RandomFlip3D'),
             dict(
                 type='PointsRangeFilter', point_cloud_range=point_cloud_range),
             dict(
-                type='DefaultFormatBundleMultiCam3D',
+                type='DefaultFormatBundle3D',
                 class_names=class_names,
                 with_label=False),
             dict(type='Collect3D', keys=['points'])
@@ -232,6 +227,7 @@ data = dict(
         modality=input_modality,
         classes=class_names,
         test_mode=True,
+        used_cameras=1,
         pcd_limit_range=point_cloud_range,
         box_type_3d='LiDAR',
         file_client_args=file_client_args),
@@ -245,13 +241,14 @@ data = dict(
         pipeline=test_pipeline,
         modality=input_modality,
         classes=class_names,
+        used_cameras=1,
         pcd_limit_range=point_cloud_range,
         test_mode=True,
         box_type_3d='LiDAR',
         file_client_args=file_client_args))
 # In practice PointPillars also uses a different schedule
 # optimizer
-lr = 0.001
+lr = 0.0004
 optimizer = dict(lr=lr)
 # max_norm=35 is slightly better than 10 for PointPillars in the earlier
 # development of the codebase thus we keep the setting. But we does not
