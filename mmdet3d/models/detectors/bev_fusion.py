@@ -94,6 +94,51 @@ class BEVFusion(MVXTwoStageDetector):
         losses.update(loss_fused)
         return losses    
     
+    
+    def forward_test(self, points, img_metas, img=None, radar=None, 
+                     img_feature=None, lidar2img=None, lidar2camera=None,
+                     camera_intrinsics=None, **kwargs):
+        """
+        Args:
+            points (list[torch.Tensor]): the outer list indicates test-time
+                augmentations and inner torch.Tensor should have a shape NxC,
+                which contains all points in the batch.
+            img_metas (list[list[dict]]): the outer list indicates test-time
+                augs (multiscale, flip, etc.) and the inner list indicates
+                images in a batch
+            img (list[torch.Tensor], optional): the outer
+                list indicates test-time augmentations and inner
+                torch.Tensor should have a shape NxCxHxW, which contains
+                all images in the batch. Defaults to None.
+        """
+        for var, name in [(points, 'points'), (img_metas, 'img_metas')]:
+            if not isinstance(var, list):
+                raise TypeError('{} must be a list, but got {}'.format(
+                    name, type(var)))
+
+        num_augs = len(points)
+        if num_augs != len(img_metas):
+            raise ValueError(
+                'num of augmentations ({}) != num of image meta ({})'.format(
+                    len(points), len(img_metas)))
+
+        if num_augs == 1:
+            img = [img] if img is None else img
+            radar =[radar] if radar is None else radar
+            img_feature =[img_feature] if img_feature is None else img_feature
+            lidar2img = [lidar2img] if lidar2img is None else lidar2img
+            lidar2camera = [lidar2camera] if lidar2camera is None else lidar2camera
+            camera_intrinsics = [camera_intrinsics] if camera_intrinsics  is None else camera_intrinsics
+            return self.simple_test(points=points[0], 
+                                    img_metas=img_metas[0],
+                                    img=img[0], radar=radar[0],
+                                    img_feature=img_feature[0], 
+                                    lidar2img=lidar2img[0],
+                                    lidar2camera=lidar2camera[0], 
+                                    camera_intrinsics=camera_intrinsics[0],
+                                    **kwargs)
+        else:
+            return self.aug_test(points, img_metas, img, **kwargs)
     def forward_mdfs_train(self,
                           pts_feats,
                           img_feats,

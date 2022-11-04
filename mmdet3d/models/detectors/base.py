@@ -1,6 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from os import path as osp
-from re import I
 
 import mmcv
 import torch
@@ -14,9 +13,7 @@ from mmdet.models.detectors import BaseDetector
 class Base3DDetector(BaseDetector):
     """Base class for detectors."""
 
-    def forward_test(self, points, img_metas, img=None, radar=None, 
-                     img_feature=None, lidar2img=None, lidar2camera=None,
-                     camera_intrinsics=None, **kwargs):
+    def forward_test(self, points, img_metas, img=None, **kwargs):
         """
         Args:
             points (list[torch.Tensor]): the outer list indicates test-time
@@ -43,19 +40,7 @@ class Base3DDetector(BaseDetector):
 
         if num_augs == 1:
             img = [img] if img is None else img
-            radar =[radar] if radar is None else radar
-            img_feature =[img_feature] if img_feature is None else img_feature
-            lidar2img = [lidar2img] if lidar2img is None else lidar2img
-            lidar2camera = [lidar2camera] if lidar2camera is None else lidar2camera
-            camera_intrinsics = [camera_intrinsics] if camera_intrinsics  is None else camera_intrinsics
-            return self.simple_test(points=points[0], 
-                                    img_metas=img_metas[0],
-                                    img=img[0], radar=radar[0],
-                                    img_feature=img_feature[0], 
-                                    lidar2img=lidar2img[0],
-                                    lidar2camera=lidar2camera[0], 
-                                    camera_intrinsics=camera_intrinsics[0],
-                                    **kwargs)
+            return self.simple_test(points[0], img_metas[0], img[0], **kwargs)
         else:
             return self.aug_test(points, img_metas, img, **kwargs)
 

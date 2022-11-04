@@ -477,18 +477,18 @@ class PlusKittiDataset(KittiDataset):
         for idx, pred_dicts in enumerate(
                 mmcv.track_iter_progress(net_outputs)):
             annos = []
-            info = self.data_infos[idx]
-            sample_idx = info['image']['image_idx']
             anno = {
                     'dt_boxes': [],
                     'name': [],
                     'scores': []
             }
-            if len(pred_dicts['pts_bbox']['boxes_3d']) > 0:
-                scores = pred_dicts['pts_bbox']['scores_3d']
-                box_preds_lidar = pred_dicts['pts_bbox']['boxes_3d']
-                label_preds = pred_dicts['pts_bbox']['labels_3d']
-
+            if 'pts_bbox' in pred_dicts:
+                pred_dicts = pred_dicts['pts_bbox']
+                
+            if len(pred_dicts['boxes_3d']) > 0:
+                scores = pred_dicts['scores_3d']
+                box_preds_lidar = pred_dicts['boxes_3d']
+                label_preds = pred_dicts['labels_3d']
 
                 for box_lidar, score, label in zip(
                         box_preds_lidar, scores, label_preds):
@@ -528,7 +528,7 @@ class PlusKittiDataset(KittiDataset):
                  plot_dt_result=False,
                  eval_result_dir=None,
                  eval_file_tail=None,
-                 test_flag=False):
+                 bag_test_flag=False):
         """Evaluation in KITTI protocol.
 
         Args:
@@ -555,45 +555,41 @@ class PlusKittiDataset(KittiDataset):
         """
         result_dict = None
         from mmdet3d.core.evaluation import get_formatted_results
-        result_files, tmp_dir = self.format_results(results, pklfile_prefix)  # result_files: a list of all annos of each frame
-        # det_pcdet = self.bbox2result_pcdet(results, self.CLASSES, pklfile_prefix)
-        if(not test_flag):
-            # to pcdet format
-            self.eval_cnt+=10
-            if eval_file_tail:
-                eval_cnt = eval_file_tail
-            else:
-                eval_cnt = self.eval_cnt
+        
+        dets_pcdet = self.bbox2result_pcdet(results, self.CLASSES, pklfile_prefix)
+        
+        # test bag 
+        if bag_test_flag:
+            self.save_eval_results(dets_pcdet, out_dir) # todo
+            return result_dict
             
-            gt_annos_pcdet = []
-            for info in self.data_infos:
-                gt_boxes = info['annos']['gt_boxes_lidar'] 
-                gt_names = info['annos']['name'] 
-                gt_anno = {'gt_boxes': gt_boxes, 'name': gt_names}
-                gt_annos_pcdet.append(gt_anno)
+        # to pcdet format
+        self.eval_cnt+=10
+        if eval_file_tail:
+            eval_cnt = eval_file_tail
+        else:
+            eval_cnt = self.eval_cnt
+        
+        gt_annos_pcdet = []
+        for info in self.data_infos:
+            gt_boxes = info['annos']['gt_boxes_lidar'] 
+            gt_names = info['annos']['name'] 
+            gt_anno = {'gt_boxes': gt_boxes, 'name': gt_names}
+            gt_annos_pcdet.append(gt_anno)
 
-            if isinstance(result_files, dict):
-                for name, result_files_ in result_files.items():
-                    if 'img' in name:
-                        continue
-                    result_str, result_dict = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, result_files_, eval_result_dir, eval_cnt)
-                    break
-            else:
-                result_str, result_dict = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, result_files, eval_result_dir, eval_cnt)
-            
-            # result_str, result_dict = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, det_pcdet, eval_result_dir, eval_cnt)
-            
-            print_log('\n' + '****************pcdet eval start.*****************', logger=logger)
-            print_log('\n' + result_str, logger=logger)
-            print_log('\n' + '****************pcdet eval done.*****************', logger=logger)
+        result_str, result_dict = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, dets_pcdet, eval_result_dir, eval_cnt)
+        
+        print_log('\n' + '****************pcdet eval start.*****************', logger=logger)
+        print_log('\n' + result_str, logger=logger)
+        print_log('\n' + '****************pcdet eval done.*****************', logger=logger)
 
-            eval_file_name = f'human_readable_results_{eval_cnt}.txt'
-            
-            if eval_result_dir is not None:
-                with open(os.path.join(eval_result_dir, eval_file_name), 'w') as f:
-                    f.write(result_str)
+        eval_file_name = f'human_readable_results_{eval_cnt}.txt'
+        
+        if eval_result_dir is not None:
+            with open(os.path.join(eval_result_dir, eval_file_name), 'w') as f:
+                f.write(result_str)
         if plot_dt_result:
-            self.save_eval_results(result_files, out_dir) # todo
+            self.save_eval_results(dets_pcdet, out_dir) # todo
         return result_dict
     
     @staticmethod

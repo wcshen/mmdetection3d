@@ -3,19 +3,29 @@ _base_ = [
 ]
 
 # model settings
-voxel_size = [0.5, 0.5, 8]
+voxel_size = [0.25, 0.25, 8]
 point_cloud_range = [0, -10, -2, 100, 10, 6]
 used_cameras=2
-
+use_offline_img_feat=True
+used_sensors = {'use_lidar': True,
+               'use_camera': True,
+               'use_radar': False}
 grid_config = {
     'x': [0, 100, voxel_size[0]],
     'y': [-10, 10, voxel_size[1]],
     'z': [-10.0, 10.0, 20.0],
     'depth': [1.0, 100.0, 1],
 }
+bev_grid_map_size = [
+    int((grid_config['y'][1] - grid_config['y'][0]) / voxel_size[1]),
+    int((grid_config['x'][1] - grid_config['x'][0]) / voxel_size[0]),
+    ]
+
 
 model = dict(
     type='BEVFusion',
+    used_sensors=used_sensors,
+    use_offline_img_feat=use_offline_img_feat,
     img_backbone=dict(
         type='ResNet',
         depth=50,
@@ -32,9 +42,10 @@ model = dict(
     #     out_channels=64,
     #     accelerate=False,
     # ),
-    img_neck=dict(type='LSSTransform',
+    img_neck=dict(type='DepthLSSTransform',
         in_channels=64,
         out_channels=64,
+        image_size=(540, 960),
         feature_size=(104, 200),
         xbound=grid_config['x'],
         ybound=grid_config['y'],
@@ -56,7 +67,7 @@ model = dict(
         use_pcdet=True,
         point_cloud_range=point_cloud_range),
     pts_middle_encoder=dict(
-        type='PointPillarsScatter', in_channels=64, output_shape=[40, 200]),
+        type='PointPillarsScatter', in_channels=64, output_shape=bev_grid_map_size),
     pts_backbone=dict(
         type='PcdetBackbone',
         in_channels=128,
@@ -173,16 +184,17 @@ train_pipeline = [
     # dict(type='ObjectSample', db_sampler=db_sampler, use_ground_plane=True),
     dict(type='LoadMultiCamImagesFromFile', to_float32=True),
     # dict(type='PaintPointsWithImageFeature', used_cameras=used_cameras, drop_camera_prob=100),
-    # dict(type='RandomFlipLidarOnly', flip_ratio_bev_horizontal=0.5),
-    # dict(
-    #     type='GlobalRotScaleTrans',
-    #     rot_range=[-0.4, 0.4],
-    #     scale_ratio_range=[0.95, 1.05]),
+    dict(type='RandomFlipLidarOnly', flip_ratio_bev_horizontal=0.5),
+    dict(
+        type='GlobalRotScaleTrans',
+        rot_range=[-0.4, 0.4],
+        scale_ratio_range=[0.95, 1.05]),
     dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='PointShuffle'),
     dict(type='DefaultFormatBundle3D', class_names=class_names),
-    dict(type='Collect3D', keys=['points', 'img', 'gt_bboxes_3d', 'gt_labels_3d'])
+    dict(type='Collect3D', keys=['points', 'img', 'gt_bboxes_3d', 'gt_labels_3d', 
+                                 'img_feature', 'lidar2img', 'lidar2camera', 'camera_intrinsics'])
 ]
 
 test_pipeline = [
@@ -213,24 +225,8 @@ test_pipeline = [
                 type='DefaultFormatBundle3D',
                 class_names=class_names,
                 with_label=False),
-            dict(type='Collect3D', keys=['points', 'img'])
+            dict(type='Collect3D', keys=['points', 'img', 'img_feature', 'lidar2img', 'lidar2camera', 'camera_intrinsics'])
         ])
-]
-# construct a pipeline for data and gt loading in show function
-# please keep its loading function consistent with test_pipeline (e.g. client)
-eval_pipeline = [
-    dict(
-        type='LoadPointsFromFile',
-        coord_type='LIDAR',
-        load_dim=4,
-        use_dim=4,
-        point_type='float64',
-        file_client_args=file_client_args),
-    dict(
-        type='DefaultFormatBundle3D',
-        class_names=class_names,
-        with_label=False),
-    dict(type='Collect3D', keys=['points', 'img'])
 ]
 
 data = dict(
@@ -243,6 +239,7 @@ data = dict(
             type=dataset_type,
             data_root=l3_data_root,
             ann_file=l3_data_root + 'Kitti_L4_data_mm3d_infos_train.pkl',
+            # ann_file=l3_data_root + 'l4e_mini_data_train.pkl',
             split='training',
             pts_prefix='pointcloud',
             pipeline=train_pipeline,
@@ -259,6 +256,7 @@ data = dict(
         type=dataset_type,
         data_root=l3_data_root,
         ann_file=l3_data_root + 'Kitti_L4_data_mm3d_infos_val.pkl',
+        # ann_file=l3_data_root + 'l4e_mini_data_val.pkl',
         split='training',
         pts_prefix='pointcloud',
         pipeline=test_pipeline,
@@ -300,8 +298,8 @@ optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 runner = dict(max_epochs=80)
 
 # Use evaluation interval=2 reduce the number of evaluation timese
-evaluation = dict(interval=10, pipeline=eval_pipeline)
-checkpoint_config = dict(interval=2)
+evaluation = dict(interval=10)
+checkpoint_config = dict(interval=10)
 workflow = [('train', 2), ('val', 1)]
 # resume_from ='/mnt/intel/jupyterhub/mrb/code/mm3d_bevfusion/train_log/mm3d/pcdet_bev_fusion/20221020-095511/epoch_4.pth'
 find_unused_parameters=True
