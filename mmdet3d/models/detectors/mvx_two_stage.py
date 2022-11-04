@@ -188,21 +188,36 @@ class MVXTwoStageDetector(Base3DDetector):
     def extract_img_feat(self, img, img_metas):
         """Extract features of images."""
         if self.with_img_backbone and img is not None:
-            input_shape = img.shape[-2:]
-            # update real input shape of each single img
-            for img_meta in img_metas:
-                img_meta.update(input_shape=input_shape)
+            # input_shape = img.shape[-2:]
+            # # update real input shape of each single img
+            # for img_meta in img_metas:
+            #     img_meta.update(input_shape=input_shape)
 
             if img.dim() == 5 and img.size(0) == 1:
                 img.squeeze_(0)
             elif img.dim() == 5 and img.size(0) > 1:
                 B, N, C, H, W = img.size()
                 img = img.view(B * N, C, H, W)
-            img_feats = self.img_backbone(img.float())
+            # img_feats = self.img_backbone(img.float())
+            
+            img_feats = []
+            lidar2img = []
+            lidar2camera = []
+            camera_intrinsics = []
+            for meta in img_metas:
+                img_feats.append(meta['img_feature'].data)
+                lidar2img.append(meta['lidar2img'].data)
+                lidar2camera.append(meta['lidar2camera'].data)
+                camera_intrinsics.append(meta['camera_intrinsics'].data)
+
+            img_feats = torch.stack(img_feats).squeeze(2).to(img.device) # BxCxHxW
+            lidar2img = torch.stack(lidar2img).to(img.device)
+            lidar2camera = torch.stack(lidar2camera).to(img.device)
+            camera_intrinsics = torch.stack(camera_intrinsics).to(img.device)
         else:
             return None
         if self.with_img_neck:
-            img_feats = self.img_neck(img_feats)
+            img_feats = self.img_neck(img_feats, img_metas, lidar2img, lidar2camera, camera_intrinsics)
         return img_feats
 
     def extract_pts_feat(self, pts, img_feats, img_metas):
@@ -221,7 +236,7 @@ class MVXTwoStageDetector(Base3DDetector):
 
     def extract_feat(self, points, img, img_metas):
         """Extract features from images and points."""
-        img_feats = self.extract_img_feat(img, img_metas)
+        img_feats = self.extract_img_feat(img, img_metas) #
         pts_feats = self.extract_pts_feat(points, img_feats, img_metas)
         return (img_feats, pts_feats)
 
@@ -295,15 +310,15 @@ class MVXTwoStageDetector(Base3DDetector):
                                                 gt_labels_3d, img_metas,
                                                 gt_bboxes_ignore)
             losses.update(losses_pts)
-        if img_feats:
-            losses_img = self.forward_img_train(
-                img_feats,
-                img_metas=img_metas,
-                gt_bboxes=gt_bboxes,
-                gt_labels=gt_labels,
-                gt_bboxes_ignore=gt_bboxes_ignore,
-                proposals=proposals)
-            losses.update(losses_img)
+        # if img_feats:
+        #     losses_img = self.forward_img_train(
+        #         img_feats,
+        #         img_metas=img_metas,
+        #         gt_bboxes=gt_bboxes,
+        #         gt_labels=gt_labels,
+        #         gt_bboxes_ignore=gt_bboxes_ignore,
+        #         proposals=proposals)
+        #     losses.update(losses_img)
         return losses
 
     def forward_pts_train(self,
@@ -427,11 +442,11 @@ class MVXTwoStageDetector(Base3DDetector):
                 pts_feats, img_feats, img_metas, rescale=rescale)
             for result_dict, pts_bbox in zip(bbox_list, bbox_pts):
                 result_dict['pts_bbox'] = pts_bbox
-        if img_feats and self.with_img_bbox:
-            bbox_img = self.simple_test_img(
-                img_feats, img_metas, rescale=rescale)
-            for result_dict, img_bbox in zip(bbox_list, bbox_img):
-                result_dict['img_bbox'] = img_bbox
+        # if img_feats and self.with_img_bbox:
+        #     bbox_img = self.simple_test_img(
+        #         img_feats, img_metas, rescale=rescale)
+        #     for result_dict, img_bbox in zip(bbox_list, bbox_img):
+        #         result_dict['img_bbox'] = img_bbox
         return bbox_list
 
     def aug_test(self, points, img_metas, imgs=None, rescale=False):

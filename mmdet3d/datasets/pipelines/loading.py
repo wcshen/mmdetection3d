@@ -463,11 +463,9 @@ class LoadMultiViewImageFromFiles(object):
         """
         filename = results['img_filename']
         # img is of shape (h, w, c, num_views)
-        img = np.stack(
-            [mmcv.imread(name, self.color_type) for name in filename], axis=-1)
         if self.img_scale is None:
             img = np.stack(
-                [mmcv.imread(name, self.color_type) for name in filename], axis=-1)
+                [mmcv.imread(name, self.color_type) for name in filename], axis=-1) # 这里的形式是numpy，需要所有camera分辨率是一致的。
         else:
             img = np.stack(
                 [self.pad(mmcv.imread(name, self.color_type)) for name in filename], axis=-1)
@@ -1130,7 +1128,7 @@ class LoadAnnotations3D(LoadAnnotations):
 
 
 @PIPELINES.register_module()
-class LoadMultiCamImagesFromFile:
+class LoadMultiCamImagesFromFile: #这里是用新写的，因为img形式不一样
     """Load images of multiple cameras
 
     Args:
@@ -1178,7 +1176,7 @@ class LoadMultiCamImagesFromFile:
         results['img_fields'] = ['img']
         results['img_feature'] = []
 
-        for filename in results['img_info']:
+        for idx, filename in enumerate(results['img_info']):
             img_bytes = self.file_client.get(filename)
             img = mmcv.imfrombytes(
                 img_bytes, flag=self.color_type, channel_order=self.channel_order)
@@ -1189,10 +1187,23 @@ class LoadMultiCamImagesFromFile:
             results['filename'].append(filename)
             results['ori_filename'].append(filename)
             results['img'].append(img)
-            results['img_shape'].append(img.shape)
+            if img.shape[0] == 1080:
+                lidar2cam = results['lidar2camera'][idx]
+                
+                half_intri =  results['camera_intrinsics'][idx][0:2, 0:3] / 2
+                results['camera_intrinsics'][idx][0:2, 0:3] = half_intri
+                
+                intri = results['camera_intrinsics'][idx]
+                
+                lidar2img = np.dot(intri, lidar2cam) #
+                
+                results['img_shape'].append((540, 960, 3))
+                results['lidar2img'][idx] = lidar2img
+            else:
+                results['img_shape'].append(img.shape)
+                
             results['ori_shape'].append(img.shape)
             results['img_feature'].append(np.load(feature_name))
-        # print(results['img_shape'])
         return results
 
     def __repr__(self):

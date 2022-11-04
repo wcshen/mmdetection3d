@@ -178,7 +178,7 @@ def main():
         init_dist(args.launcher, **cfg.dist_params)
 
     test_dataloader_default_args = dict(
-        samples_per_gpu=1, workers_per_gpu=2, dist=distributed, shuffle=False)
+        samples_per_gpu=4, workers_per_gpu=4, dist=distributed, shuffle=False)
 
     # in case the test dataset is concatenated
     if isinstance(cfg.data.test, dict):
@@ -231,7 +231,7 @@ def main():
 
     if not distributed:
         model = MMDataParallel(model, device_ids=cfg.gpu_ids)
-        outputs = single_gpu_test(model, data_loader, args.show, args.show_dir)
+        outputs = single_gpu_test(model, data_loader, False, args.show_dir)
     else:
         model = MMDistributedDataParallel(
             model.cuda(),
@@ -277,7 +277,7 @@ def main():
             eval_kwargs.update(dict(eval_file_tail=eval_file_tail,
                                     eval_result_dir=save_path,
                                     out_dir=plot_save_dir,
-                                    save_result=args.plot_result,
+                                    plot_dt_result=args.plot_dt_result,
                                     pklfile_prefix=pklfile_name
                                     ))
             print(dataset.evaluate(outputs, **eval_kwargs))

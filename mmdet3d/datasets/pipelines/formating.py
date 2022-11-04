@@ -48,6 +48,20 @@ class DefaultFormatBundle(object):
             else:
                 img = np.ascontiguousarray(results['img'].transpose(2, 0, 1))
                 results['img'] = DC(to_tensor(img), stack=True)
+        
+        if 'img_feature' in results:
+            feature_list = []
+            for idx, feat in enumerate(results['img_feature']):
+                feature_list.append(feat)
+            
+            feats = np.ascontiguousarray(np.stack(feature_list, axis=0))
+            results['img_feature'] = DC(to_tensor(feats), stack=True)
+        
+        for key in ['lidar2img', 'lidar2camera', 'camera_intrinsics']:
+            if key not in results:
+                continue
+            results[key] = DC(to_tensor(results[key]), stack=True)
+            
         for key in [
             'proposals', 'gt_bboxes', 'gt_bboxes_ignore', 'gt_labels',
             'gt_labels_3d', 'attr_labels', 'pts_instance_mask',
@@ -131,7 +145,8 @@ class Collect3D(object):
     def __init__(
             self,
             keys,
-            meta_keys=('filename', 'ori_shape', 'img_shape', 'lidar2img', 'img_feature',
+            meta_keys=('filename', 'ori_shape', 'img_shape', 'lidar2img', 
+                       'lidar2camera', 'camera_intrinsics', 'img_feature',
                        'depth2img', 'cam2img', 'pad_shape', 'scale_factor', 'flip',
                        'pcd_horizontal_flip', 'pcd_vertical_flip', 'box_mode_3d',
                        'box_type_3d', 'img_norm_cfg', 'pcd_trans', 'sample_idx',

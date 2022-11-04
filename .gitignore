@@ -115,6 +115,8 @@ data
 *.pkl.json
 *.log.json
 work_dirs/
+work_dirs
+train_log
 exps/
 *~
 mmdet3d/.mim

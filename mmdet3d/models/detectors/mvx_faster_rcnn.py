@@ -50,11 +50,11 @@ class DynamicMVXFasterRCNN(MVXTwoStageDetector):
         """Extract point features."""
         if not self.with_pts_bbox:
             return None
-        voxels, coors = self.voxelize(points)
-        voxel_features, feature_coors = self.pts_voxel_encoder(
-            voxels, coors, points, img_feats, img_metas)
+        voxels, num_points, coors = self.voxelize(points)
+        voxel_features = self.pts_voxel_encoder(
+            voxels, num_points, coors)
         batch_size = coors[-1, 0] + 1
-        x = self.pts_middle_encoder(voxel_features, feature_coors, batch_size)
+        x = self.pts_middle_encoder(voxel_features, coors, batch_size)
         x = self.pts_backbone(x)
         if self.with_pts_neck:
             x = self.pts_neck(x)
