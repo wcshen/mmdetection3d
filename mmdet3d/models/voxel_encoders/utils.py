@@ -180,3 +180,64 @@ class PFNLayer(nn.Module):
             x_repeat = x_max.repeat(1, inputs.shape[1], 1)
             x_concatenated = torch.cat([x, x_repeat], dim=2)
             return x_concatenated
+
+
+class PcdetPFNLayer(nn.Module):
+    """Pillar Feature Net Layer.
+
+    The Pillar Feature Net is composed of a series of these layers, but the
+    PointPillars paper results only used a single PFNLayer.
+
+    Args:
+        in_channels (int): Number of input channels.
+        out_channels (int): Number of output channels.
+        norm_cfg (dict, optional): Config dict of normalization layers.
+            Defaults to dict(type='BN1d', eps=1e-3, momentum=0.01).
+        last_layer (bool, optional): If last_layer, there is no
+            concatenation of features. Defaults to False.
+        mode (str, optional): Pooling model to gather features inside voxels.
+            Defaults to 'max'.
+    """
+
+    def __init__(self,
+                 in_channels,
+                 out_channels,
+                 use_norm=True,
+                 last_layer=False
+                 ):
+
+        super().__init__()
+        self.fp16_enabled = False
+        self.name = 'PcdetPFNLayer'
+        self.last_vfe = last_layer
+        if not self.last_vfe:
+            out_channels = out_channels // 2
+        self.units = out_channels
+
+        self.use_norm = use_norm
+        if self.use_norm:
+            self.conv_layer1 = nn.Conv2d(in_channels, out_channels,  kernel_size=1)
+            self.norm = nn.BatchNorm2d(out_channels, eps=1e-3, momentum=0.01)
+
+    @auto_fp16(apply_to=('inputs'), out_fp32=True)
+    def forward(self, inputs, num_voxels=None, aligned_distance=None):
+        """Forward function.
+
+        Args:
+            inputs (torch.Tensor): Pillar/Voxel inputs with shape (N, M, C).
+                N is the number of voxels, M is the number of points in
+                voxels, C is the number of channels of point features.
+            num_voxels (torch.Tensor, optional): Number of points in each
+                voxel. Defaults to None.
+            aligned_distance (torch.Tensor, optional): The distance of
+                each points to the voxel center. Defaults to None.
+
+        Returns:
+            torch.Tensor: Features of Pillars.
+        """
+        # BxFxPxN
+        x = self.conv_layer1(inputs)
+        x = self.norm(x)
+        x = F.relu(x)
+        x = torch.max(x, dim=-1, keepdim=True)[0]
+        return x

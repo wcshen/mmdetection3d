@@ -1,8 +1,8 @@
 # dataset settings
 dataset_type = 'PlusKittiDataset'
-data_root = 'data/L4E_origin_data/'
+data_root = '/mnt/intel/jupyterhub/swc/datasets/pc_label_trainval/CN_L4_origin_data/'
 class_names = ['Pedestrian', 'Cyclist', 'Car', 'Truck']
-point_cloud_range = [0, -10.0, -2.0, 150.0, 10.0, 6.0]
+point_cloud_range = [-50, -50, -2, 150, 50, 6]
 input_modality = dict(use_lidar=True, use_camera=True)
 
 file_client_args = dict(backend='disk')
@@ -116,7 +116,7 @@ eval_pipeline = [
 ]
 
 data = dict(
-    samples_per_gpu=8,
+    samples_per_gpu=4,
     workers_per_gpu=4,
     train=dict(
         type='RepeatDataset',
@@ -151,7 +151,7 @@ data = dict(
         file_client_args=file_client_args),
     test=dict(
         type=dataset_type,
-        data_root=data_root,
+        data_root='/mnt/intel/jupyterhub/swc/datasets/pc_label_trainval/CN_L4_origin_benchmark/',
         ann_file=data_root + 'Kitti_L4_data_mm3d_infos_val.pkl',
         split='training',
         pts_prefix='pointcloud',
@@ -163,4 +163,4 @@ data = dict(
         box_type_3d='LiDAR',
         file_client_args=file_client_args))
 
-evaluation = dict(interval=1, pipeline=eval_pipeline)
+evaluation = dict(interval=10, pipeline=eval_pipeline)

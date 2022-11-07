@@ -165,7 +165,7 @@ class BasePoints(object):
             rot_mat_T = rot_mat_T.squeeze(0)
         else:
             # rotation.numel() == 9
-            self.tensor[:, :3] = self.tensor[:, :3] @ rotation
+            self.tensor[:, :3] = self.tensor[:, :3] @ rotation.type_as(self.tensor)
             rot_mat_T = rotation
 
         return rot_mat_T

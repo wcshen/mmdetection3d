@@ -9,6 +9,7 @@ from .imvotenet import ImVoteNet
 from .imvoxelnet import ImVoxelNet
 from .mink_single_stage import MinkSingleStage3DDetector
 from .mvx_faster_rcnn import DynamicMVXFasterRCNN, MVXFasterRCNN
+from .bev_fusion import BEVFusion
 from .mvx_two_stage import MVXTwoStageDetector
 from .parta2 import PartA2
 from .point_rcnn import PointRCNN
@@ -18,6 +19,7 @@ from .smoke_mono3d import SMOKEMono3D
 from .ssd3dnet import SSD3DNet
 from .votenet import VoteNet
 from .voxelnet import VoxelNet
+from .transfusion import TransFusionDetector
 
 from .obj_dgcnn import ObjDGCNN
 # from .detr3d import Detr3D
@@ -27,5 +29,5 @@ __all__ = [
     'DynamicMVXFasterRCNN', 'MVXFasterRCNN', 'PartA2', 'VoteNet', 'H3DNet',
     'CenterPoint', 'SSD3DNet', 'ImVoteNet', 'SingleStageMono3DDetector',
     'FCOSMono3D', 'ImVoxelNet', 'GroupFree3DNet', 'PointRCNN', 'SMOKEMono3D',
-    'MinkSingleStage3DDetector', 'SASSD', 'ObjDGCNN'
+    'MinkSingleStage3DDetector', 'SASSD', 'ObjDGCNN', 'TransFusionDetector', 'BEVFusion'
 ]
