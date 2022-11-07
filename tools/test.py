@@ -2,6 +2,7 @@
 import argparse
 import os
 import warnings
+from pathlib import Path
 
 import mmcv
 import torch
@@ -69,6 +70,9 @@ def parse_args():
         help='evaluation metrics, which depends on the dataset, e.g., "bbox",'
         ' "segm", "proposal" for COCO, and "mAP", "recall" for PASCAL VOC')
     parser.add_argument('--show', action='store_true', help='show results')
+    parser.add_argument('--plot_result', action='store_true', help='save results')
+    parser.add_argument('--plus_eval', action='store_true', help='eval one pth')
+    
     parser.add_argument(
         '--show-dir', help='directory where results will be saved')
     parser.add_argument(
@@ -131,7 +135,7 @@ def main():
     args = parse_args()
 
     assert args.out or args.eval or args.format_only or args.show \
-        or args.show_dir, \
+        or args.show_dir or args.plot_result or args.plus_eval, \
         ('Please specify at least one operation (save/eval/format/show the '
          'results / save the results) with the argument "--out", "--eval"'
          ', "--format-only", "--show" or "--show-dir"')
@@ -174,7 +178,7 @@ def main():
         init_dist(args.launcher, **cfg.dist_params)
 
     test_dataloader_default_args = dict(
-        samples_per_gpu=1, workers_per_gpu=2, dist=distributed, shuffle=False)
+        samples_per_gpu=4, workers_per_gpu=4, dist=distributed, shuffle=False)
 
     # in case the test dataset is concatenated
     if isinstance(cfg.data.test, dict):
@@ -227,7 +231,7 @@ def main():
 
     if not distributed:
         model = MMDataParallel(model, device_ids=cfg.gpu_ids)
-        outputs = single_gpu_test(model, data_loader, args.show, args.show_dir)
+        outputs = single_gpu_test(model, data_loader, False, args.show_dir)
     else:
         model = MMDistributedDataParallel(
             model.cuda(),
@@ -253,6 +257,30 @@ def main():
             ]:
                 eval_kwargs.pop(key, None)
             eval_kwargs.update(dict(metric=args.eval, **kwargs))
+            print(dataset.evaluate(outputs, **eval_kwargs))
+        if args.plus_eval:
+            eval_kwargs = cfg.get('evaluation', {}).copy()
+            # hard-code way to remove EvalHook args
+            for key in [
+                    'interval', 'tmpdir', 'start', 'gpu_collect', 'save_best',
+                    'rule'
+            ]:
+                eval_kwargs.pop(key, None)
+            ckpt_name = os.path.basename(args.checkpoint)
+            eval_file_tail = int(ckpt_name.split('.')[0].split('_')[1])
+            base_dir = os.path.split(args.checkpoint)[0]
+            save_path = os.path.join(base_dir, 'single_eval', ckpt_name)
+            os.makedirs(save_path, exist_ok=True)
+            plot_save_dir = os.path.join(save_path, 'plot_results')
+            os.makedirs(plot_save_dir, exist_ok=True)
+            pklfile_name = os.path.join(save_path,'epoch_'+str(eval_file_tail)+'_')
+            eval_kwargs.update(dict(eval_file_tail=eval_file_tail,
+                                    eval_result_dir=save_path,
+                                    out_dir=plot_save_dir,
+                                    plot_dt_result=args.plot_result,
+                                    pklfile_prefix=pklfile_name,
+                                    bag_test_flag=False
+                                    ))
             print(dataset.evaluate(outputs, **eval_kwargs))
 
 

@@ -107,6 +107,7 @@ class DataBaseSampler(object):
                      type='LoadPointsFromFile',
                      coord_type='LIDAR',
                      load_dim=4,
+                     point_type='float64',
                      use_dim=[0, 1, 2, 3]),
                  file_client_args=dict(backend='disk')):
         super().__init__()

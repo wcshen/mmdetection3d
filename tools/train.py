@@ -146,6 +146,7 @@ def main():
         work_dirs = './work_dirs/' + current_time
         cfg.work_dir = osp.join(work_dirs,
                                 osp.splitext(osp.basename(args.config))[0])
+    
     if args.resume_from is not None:
         cfg.resume_from = args.resume_from
 
@@ -233,9 +234,51 @@ def main():
         test_cfg=cfg.get('test_cfg'))
     model.init_weights()
 
+    if 'freeze_lidar_components' in cfg and cfg['freeze_lidar_components'] is True:
+        logger.info(f"param need to update:")
+        param_grad = []
+        param_nograd = []
+
+        for name, param in model.named_parameters():
+            if 'pts' in name and 'pts_bbox_head' not in name:
+                param.requires_grad = False
+            if 'pts_bbox_head.decoder.0' in name:
+                param.requires_grad = False
+            if 'pts_bbox_head.shared_conv' in name and 'pts_bbox_head.shared_conv_img' not in name:
+                param.requires_grad = False
+            if 'pts_bbox_head.heatmap_head' in name and 'pts_bbox_head.heatmap_head_img' not in name:
+                param.requires_grad = False
+            if 'pts_bbox_head.prediction_heads.0' in name:
+                param.requires_grad = False
+            if 'pts_bbox_head.class_encoding' in name:
+                param.requires_grad = False
+
+        from torch import nn
+
+        def fix_bn(m):
+            if isinstance(m, nn.BatchNorm1d) or isinstance(m, nn.BatchNorm2d):
+                m.track_running_stats = False
+
+        model.pts_voxel_layer.apply(fix_bn)
+        model.pts_voxel_encoder.apply(fix_bn)
+        model.pts_middle_encoder.apply(fix_bn)
+        model.pts_backbone.apply(fix_bn)
+        model.pts_neck.apply(fix_bn)
+        model.pts_bbox_head.heatmap_head.apply(fix_bn)
+        model.pts_bbox_head.shared_conv.apply(fix_bn)
+        model.pts_bbox_head.class_encoding.apply(fix_bn)
+        model.pts_bbox_head.decoder[0].apply(fix_bn)
+        model.pts_bbox_head.prediction_heads[0].apply(fix_bn)
+        for name, param in model.named_parameters():
+            if param.requires_grad is True:
+                logger.info(name)
+                param_grad.append(name)
+            else:
+                param_nograd.append(name)
+
     logger.info(f'Model:\n{model}')
     datasets = [build_dataset(cfg.data.train)]
-    if len(cfg.workflow) == 2:
+    if len(cfg.workflow) == 2: # 如果workflow长度是2，则把val dataset也加上
         val_dataset = copy.deepcopy(cfg.data.val)
         # in case we use a dataset wrapper
         if 'dataset' in cfg.data.train:
