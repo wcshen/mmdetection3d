@@ -277,8 +277,9 @@ def main():
             eval_kwargs.update(dict(eval_file_tail=eval_file_tail,
                                     eval_result_dir=save_path,
                                     out_dir=plot_save_dir,
-                                    plot_dt_result=args.plot_dt_result,
-                                    pklfile_prefix=pklfile_name
+                                    plot_dt_result=args.plot_result,
+                                    pklfile_prefix=pklfile_name,
+                                    bag_test_flag=False
                                     ))
             print(dataset.evaluate(outputs, **eval_kwargs))
 
