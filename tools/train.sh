@@ -16,7 +16,7 @@ function train()
     PORT=30000 \
     bash tools/dist_train.sh \
     configs/L3_data_models/pcdet_bev_fusion.py \
-    8 --work-dir add_lidar_depth
+    8 --work-dir work_dirs --extra-tag  debug
 }
 
 function plot_pr_curv()

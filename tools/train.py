@@ -37,6 +37,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Train a detector')
     parser.add_argument('config', help='train config file path')
     parser.add_argument('--work-dir', help='the dir to save logs and models')
+    parser.add_argument('--extra-tag', default='', required=True, help='the dir to save logs and models')
     parser.add_argument(
         '--resume-from', help='the checkpoint file to resume from')
     parser.add_argument(
@@ -140,7 +141,7 @@ def main():
         data_name = osp.splitext(args.config)[0].split('/')[1]
         exp_name = osp.splitext(os.path.basename(args.config))[0].split('_')[0]
         # eg: /mnt/intel/jupyterhub/xxx/train_log/mm3d/  L4  /pointpillars  /single_head/  cfg_name   /time
-        cfg.work_dir = osp.join(args.work_dir, data_name, exp_name, cfg.extra_tag, osp.splitext(osp.basename(args.config))[0], current_time)
+        cfg.work_dir = osp.join(args.work_dir, data_name, exp_name, args.extra_tag, osp.splitext(osp.basename(args.config))[0], current_time)
     elif cfg.get('work_dir', None) is None:
         # use config filename as default work_dir if cfg.work_dir is None
         work_dirs = './work_dirs/' + current_time
