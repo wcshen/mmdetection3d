@@ -234,6 +234,9 @@ def main():
         train_cfg=cfg.get('train_cfg'),
         test_cfg=cfg.get('test_cfg'))
     model.init_weights()
+    
+    if 'use_sync_bn' in cfg and cfg['use_sync_bn']:
+        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
 
     if 'freeze_lidar_components' in cfg and cfg['freeze_lidar_components'] is True:
         logger.info(f"param need to update:")
