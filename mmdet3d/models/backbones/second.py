@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+from multiprocessing import reduction
 import warnings
 
 import numpy as np
@@ -8,6 +9,7 @@ from mmcv.runner import BaseModule
 from torch import nn as nn
 
 from ..builder import BACKBONES
+from ..attention_block import CBAMBlock
 
 
 @BACKBONES.register_module()
@@ -123,6 +125,16 @@ class PcdetBackbone(BaseModule):
         c_in_list = [in_channels, *num_filters[:-1]]
         self.blocks = nn.ModuleList()
         self.deblocks = nn.ModuleList()
+        
+        cbam_1 = CBAMBlock(channel=64, reduction=16, kernel_size=7)
+        cbam_2 = CBAMBlock(channel=128, reduction=16, kernel_size=5)
+        cbam_3 = CBAMBlock(channel=256, reduction=16, kernel_size=3)
+        
+        self.attention_blocks = nn.ModuleList()
+        self.attention_blocks.append(cbam_1)
+        self.attention_blocks.append(cbam_2)
+        self.attention_blocks.append(cbam_3)
+        
         for idx in range(num_levels):
             cur_layers = [
                 nn.ZeroPad2d(1),
@@ -195,6 +207,7 @@ class PcdetBackbone(BaseModule):
         ups = []
         for i in range(len(self.blocks)):
             x = self.blocks[i](x)
+            x = self.attention_blocks[i](x)
             if len(self.deblocks) > 0:
                 ups.append(self.deblocks[i](x))
             else:

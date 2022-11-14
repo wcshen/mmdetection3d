@@ -74,11 +74,11 @@ def main():
         # ###################################### Convert VFE model to ONNX ######################################
         # VFE input: max_num_pillars, max_num_points_per_pillar, point_features
         vfe_input = torch.ones(
-            [1, max_num_pillars, max_num_points_per_pillar, 74], dtype=torch.float32, device=torch.device('cuda:0'))
+            [1, max_num_pillars, max_num_points_per_pillar, 10], dtype=torch.float32, device=torch.device('cuda:0'))
 
         vfe_input_names = ['vfe_input']
         vfe_output_names = ['pillar_features']
-        output_onnx_file = './tools/export_onnx/pfe.onnx'
+        output_onnx_file = './tools/export_onnx/mm3d_sync_bn_pfe.onnx'
         torch.onnx.export(vfe_model, vfe_input, output_onnx_file, verbose=True,
                           input_names=vfe_input_names, output_names=vfe_output_names)
         print("[SUCCESS] PFE model is converted to ONNX.")
@@ -89,7 +89,7 @@ def main():
             [1, num_bev_features, grid_size[0], grid_size[1]], dtype=torch.float32, device=torch.device('cuda:0'))
         rpn_input_names = ['spatial_features']
         rpn_output_names = ['cls_preds', 'box_preds', 'dir_cls_preds']
-        output_onnx_file = './tools/export_onnx/rpn.onnx'
+        output_onnx_file = './tools/export_onnx/mm3d_sync_bn_rpn.onnx'
         torch.onnx.export(rpn_model, rpn_input, output_onnx_file, verbose=True,
                           input_names=rpn_input_names, output_names=rpn_output_names)
         print("[SUCCESS] RPN model is converted to ONNX.")

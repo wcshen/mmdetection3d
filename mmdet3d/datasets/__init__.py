@@ -23,7 +23,7 @@ from .pipelines import (AffineResize, BackgroundPointsFilter, GlobalAlignment,
                         RandomFlip3D, RandomJitterPoints, RandomRotate,
                         RandomShiftScale, RangeLimitedRandomCrop,
                         VoxelBasedPointSampler, LoadMultiCamImagesFromFile, DefaultFormatBundleMultiCam3D, 
-                        PaintPointsWithImageFeature, RandomFlipLidarOnly)
+                        PaintPointsWithImageFeature, RandomFlipLidarOnly, GetGtMasks)
 # yapf: enable
 from .s3dis_dataset import S3DISDataset, S3DISSegDataset
 from .scannet_dataset import (ScanNetDataset, ScanNetInstanceSegDataset,
@@ -49,5 +49,5 @@ __all__ = [
     'RandomShiftScale', 'LoadPointsFromDict', 'PIPELINES',
     'RangeLimitedRandomCrop', 'RandomRotate', 'MultiViewWrapper', 'PlusKittiDataset',
     'LoadMultiCamImagesFromFile', 'DefaultFormatBundleMultiCam3D', 'PaintPointsWithImageFeature',
-    'RandomFlipLidarOnly'
+    'RandomFlipLidarOnly', 'GetGtMasks'
 ]

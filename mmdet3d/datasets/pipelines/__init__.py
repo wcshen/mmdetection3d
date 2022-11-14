@@ -18,6 +18,7 @@ from .transforms_3d import (AffineResize, BackgroundPointsFilter,
                             RandomJitterPoints, RandomRotate, RandomShiftScale,
                             RangeLimitedRandomCrop, VoxelBasedPointSampler)
 from .paint_point import PaintPointsWithImageFeature
+from .get_gt_masks import GetGtMasks
 from .custom_transform import RandomFlipLidarOnly
 
 __all__ = [
@@ -33,5 +34,5 @@ __all__ = [
     'RandomJitterPoints', 'AffineResize', 'RandomShiftScale',
     'LoadPointsFromDict', 'MultiViewWrapper', 'RandomRotate',
     'RangeLimitedRandomCrop', 'DefaultFormatBundleMultiCam3D', 'LoadMultiCamImagesFromFile',
-    'PaintPointsWithImageFeature', 'RandomFlipLidarOnly'
+    'PaintPointsWithImageFeature', 'RandomFlipLidarOnly','GetGtMasks'
 ]

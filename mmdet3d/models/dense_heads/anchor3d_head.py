@@ -67,7 +67,9 @@ class Anchor3DHead(BaseModule, AnchorTrainMixin):
                  loss_bbox=dict(
                      type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=2.0),
                  loss_dir=dict(type='CrossEntropyLoss', loss_weight=0.2),
-                 init_cfg=None):
+                 loss_mask=dict(type='FocalLoss'),
+                 init_cfg=None,
+                 with_mask=False):
         super().__init__(init_cfg=init_cfg)
         self.in_channels = in_channels
         self.num_classes = num_classes
@@ -80,11 +82,12 @@ class Anchor3DHead(BaseModule, AnchorTrainMixin):
         self.assign_per_class = assign_per_class
         self.dir_offset = dir_offset
         self.dir_limit_offset = dir_limit_offset
+        self.with_mask = with_mask
         import warnings
         warnings.warn(
             'dir_offset and dir_limit_offset will be depressed and be '
             'incorporated into box coder in the future')
-        # self.fp16_enabled = False
+        self.fp16_enabled = False
 
         # build anchor generator
         self.anchor_generator = build_prior_generator(anchor_generator)
@@ -102,7 +105,8 @@ class Anchor3DHead(BaseModule, AnchorTrainMixin):
         self.loss_cls = build_loss(loss_cls)
         self.loss_bbox = build_loss(loss_bbox)
         self.loss_dir = build_loss(loss_dir)
-        # self.fp16_enabled = False
+        self.loss_mask = build_loss(loss_mask)
+        self.fp16_enabled = False
 
         self._init_layers()
         self._init_assigner_sampler()
@@ -140,6 +144,8 @@ class Anchor3DHead(BaseModule, AnchorTrainMixin):
         if self.use_direction_classifier:
             self.conv_dir_cls = nn.Conv2d(self.feat_channels,
                                           self.num_anchors * 2, 1)
+        if self.with_mask:
+            self.conv_mask_cls = nn.Conv2d(self.feat_channels, 1, 1)
 
     def forward_single(self, x):
         """Forward function on a single-scale feature map.
@@ -154,9 +160,12 @@ class Anchor3DHead(BaseModule, AnchorTrainMixin):
         cls_score = self.conv_cls(x)
         bbox_pred = self.conv_reg(x)
         dir_cls_preds = None
+        mask_cls_preds = None
         if self.use_direction_classifier:
             dir_cls_preds = self.conv_dir_cls(x)
-        return cls_score, bbox_pred, dir_cls_preds
+        if self.with_mask:
+            mask_cls_preds = self.conv_mask_cls(x)
+        return cls_score, bbox_pred, dir_cls_preds, mask_cls_preds
 
     def forward(self, feats):
         """Forward pass.
@@ -191,7 +200,7 @@ class Anchor3DHead(BaseModule, AnchorTrainMixin):
         anchor_list = [multi_level_anchors for _ in range(num_imgs)]
         return anchor_list
 
-    def loss_single(self, cls_score, bbox_pred, dir_cls_preds, labels,
+    def loss_single(self, cls_score, bbox_pred, dir_cls_preds, mask_cls_preds, gt_masks, labels,
                     label_weights, bbox_targets, bbox_weights, dir_targets,
                     dir_weights, num_total_samples):
         """Calculate loss of Single-level results.
@@ -247,6 +256,9 @@ class Anchor3DHead(BaseModule, AnchorTrainMixin):
             pos_dir_cls_preds = dir_cls_preds[pos_inds]
             pos_dir_targets = dir_targets[pos_inds]
             pos_dir_weights = dir_weights[pos_inds]
+        
+        if self.with_mask:
+            loss_mask = self.loss_mask(mask_cls_preds.reshape(-1, 1), gt_masks.reshape(-1)) * 10.0
 
         if num_pos > 0:
             code_weight = self.train_cfg.get('code_weight', None)
@@ -275,7 +287,7 @@ class Anchor3DHead(BaseModule, AnchorTrainMixin):
             if self.use_direction_classifier:
                 loss_dir = pos_dir_cls_preds.sum()
 
-        return loss_cls, loss_bbox, loss_dir
+        return loss_cls, loss_bbox, loss_dir, loss_mask
 
     @staticmethod
     def add_sin_difference(boxes1, boxes2):
@@ -306,9 +318,11 @@ class Anchor3DHead(BaseModule, AnchorTrainMixin):
              cls_scores,
              bbox_preds,
              dir_cls_preds,
+             mask_cls_preds,
              gt_bboxes,
              gt_labels,
              input_metas,
+             gt_masks,
              gt_bboxes_ignore=None):
         """Calculate losses.
 
@@ -358,11 +372,14 @@ class Anchor3DHead(BaseModule, AnchorTrainMixin):
             num_total_pos + num_total_neg if self.sampling else num_total_pos)
 
         # num_total_samples = None
-        losses_cls, losses_bbox, losses_dir = multi_apply(
+        gt_masks = [torch.stack(gt_masks,dim=0).to(device)]
+        losses_cls, losses_bbox, losses_dir, losses_mask = multi_apply(
             self.loss_single,
             cls_scores,
             bbox_preds,
             dir_cls_preds,
+            mask_cls_preds,
+            gt_masks,
             labels_list,
             label_weights_list,
             bbox_targets_list,
@@ -371,12 +388,13 @@ class Anchor3DHead(BaseModule, AnchorTrainMixin):
             dir_weights_list,
             num_total_samples=num_total_samples)
         return dict(
-            loss_cls=losses_cls, loss_bbox=losses_bbox, loss_dir=losses_dir)
+            loss_cls=losses_cls, loss_bbox=losses_bbox, loss_dir=losses_dir, loss_mask=losses_mask)
 
     def get_bboxes(self,
                    cls_scores,
                    bbox_preds,
                    dir_cls_preds,
+                   mask_preds,
                    input_metas,
                    cfg=None,
                    rescale=False):

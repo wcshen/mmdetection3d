@@ -72,6 +72,7 @@ class VoxelNet(SingleStage3DDetector):
                       img_metas,
                       gt_bboxes_3d,
                       gt_labels_3d,
+                      gt_masks,
                       gt_bboxes_ignore=None):
         """Training forward function.
 
@@ -90,7 +91,8 @@ class VoxelNet(SingleStage3DDetector):
         """
         x = self.extract_feat(points, img_metas)
         outs = self.bbox_head(x)
-        loss_inputs = outs + (gt_bboxes_3d, gt_labels_3d, img_metas)
+        loss_inputs = outs + (gt_bboxes_3d, gt_labels_3d, img_metas, gt_masks)
+
         losses = self.bbox_head.loss(
             *loss_inputs, gt_bboxes_ignore=gt_bboxes_ignore)
         return losses

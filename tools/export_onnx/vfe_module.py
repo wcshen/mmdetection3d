@@ -120,7 +120,8 @@ class PillarFeatureNet(nn.Module):
             features = features.permute((0, 3, 1, 2))
         for pfn in self.pfn_layers:
             features = pfn(features)
-        if self.use_pcdet:
-            return features.squeeze().permute((1, 0))
-        else:
-            return features.squeeze(1)
+        # if self.use_pcdet:
+        #     return features.squeeze().permute((1, 0))
+        # else:
+        #     return features.squeeze(1)
+        return features.permute((0,2,1,3))
