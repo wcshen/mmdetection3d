@@ -7,9 +7,10 @@ from .second_fpn import SECONDFPN
 from .view_transformer import LSSViewTransformer
 from ..vtransforms.lss import LSSTransform
 from ..vtransforms.depth_lss import DepthLSSTransform
+from .fpn import FPNForBEVDet
 
 __all__ = [
     'FPN', 'SECONDFPN', 'OutdoorImVoxelNeck', 'PointNetFPNeck', 'DLANeck',
     'LSSViewTransformer',
-    'LSSTransform', 'DepthLSSTransform'
+    'LSSTransform', 'DepthLSSTransform', 'FPNForBEVDet'
 ]

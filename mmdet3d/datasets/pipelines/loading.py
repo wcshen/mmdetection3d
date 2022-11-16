@@ -1196,7 +1196,6 @@ class LoadMultiCamImagesFromFile: #这里是用新写的，因为img形式不一
             feature_name = filename.replace('_camera', '_camera_feature').replace('.jpg', '_0.npy')
             results['filename'].append(filename)
             results['ori_filename'].append(filename)
-            results['img'].append(img)
             if img.shape[0] == 1080:
                 lidar2cam = results['lidar2camera'][idx]
                 
@@ -1209,9 +1208,12 @@ class LoadMultiCamImagesFromFile: #这里是用新写的，因为img形式不一
                 
                 results['img_shape'].append((540, 960, 3))
                 results['lidar2img'][idx] = lidar2img
+                img = mmcv.imrescale(img, 0.5)
             else:
                 results['img_shape'].append(img.shape)
-                
+            
+
+            results['img'].append(img)
             results['ori_shape'].append(img.shape)
             results['img_feature'].append(np.load(feature_name))
         return results

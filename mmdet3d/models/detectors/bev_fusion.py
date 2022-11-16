@@ -4,6 +4,7 @@ from mmcv.runner import force_fp32
 from torch.nn import functional as F
 
 from ..builder import DETECTORS
+from .. import builder
 from .mvx_two_stage import MVXTwoStageDetector
 from mmdet3d.core import (Box3DMode, Coord3DMode, bbox3d2result,
                           merge_aug_bboxes_3d, show_result)
@@ -12,13 +13,20 @@ from mmdet3d.core import (Box3DMode, Coord3DMode, bbox3d2result,
 class BEVFusion(MVXTwoStageDetector):
     """Multi-modality VoxelNet using Faster R-CNN and dynamic voxelization."""
 
-    def __init__(self,used_sensors=None, use_offline_img_feat=True, **kwargs):
+    def __init__(self,used_sensors=None, use_offline_img_feat=True, img_view_transformer=None, **kwargs):
         super(BEVFusion, self).__init__(**kwargs)
         self.use_offline_img_feat = use_offline_img_feat
         self.use_LiDAR = used_sensors.get('use_lidar', False)
         self.use_Cam = used_sensors.get('use_camera', False)
         self.use_Radar = used_sensors.get('use_radar', False)
-
+        if img_view_transformer is not None:
+            self.img_view_transformer = builder.build_neck(img_view_transformer)
+    
+    @property
+    def with_img_view_transformer(self):
+        """bool: Whether the detector has a neck in image branch."""
+        return hasattr(self, 'img_view_transformer') and self.img_view_transformer is not None
+    
     def extract_pts_feat(self, points):
         """Extract point features."""
         if not self.with_pts_bbox:
@@ -170,11 +178,12 @@ class BEVFusion(MVXTwoStageDetector):
                     B, N, C, H, W = img.size()
                     img = img.view(B * N, C, H, W)
                 img_feats = self.img_backbone(img)
-            else:
-                return None
+            if self.with_img_neck:
+                img_feats = self.img_neck(img_feats)
+            img_feats = img_feats.view(B, N, img_feats.shape[-3], img_feats.shape[-2], img_feats.shape[-1])
         
-        if self.with_img_neck:
-            img_feats = self.img_neck(points, img_feats, img_metas, lidar2img, lidar2camera, camera_intrinsics)
+        if self.with_img_view_transformer:
+            img_feats = self.img_view_transformer(points, img_feats, img_metas, lidar2img, lidar2camera, camera_intrinsics)
         return img_feats
     
     def simple_test(self, points, img_metas, img=None, radar=None, rescale=False, img_feature=None, lidar2img=None, lidar2camera=None, camera_intrinsics=None):
