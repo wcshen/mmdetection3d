@@ -1185,6 +1185,8 @@ class LoadMultiCamImagesFromFile: #这里是用新写的，因为img形式不一
         results['ori_shape'] = []
         results['img_fields'] = ['img']
         results['img_feature'] = []
+        results['side_img_feature'] = []
+        results['img_feature_shape'] = []
 
         for idx, filename in enumerate(results['img_info']):
             img_bytes = self.file_client.get(filename)
@@ -1215,7 +1217,13 @@ class LoadMultiCamImagesFromFile: #这里是用新写的，因为img形式不一
 
             results['img'].append(img)
             results['ori_shape'].append(img.shape)
-            results['img_feature'].append(np.load(feature_name))
+            img_feature = np.load(feature_name)
+            if 'side_left_camera' in feature_name or 'side_right_camera' in feature_name:
+                results['side_img_feature'].append(img_feature)
+            else:  
+                results['img_feature'].append(img_feature)
+            
+            results['img_feature_shape'].append(img_feature.shape)
         return results
 
     def __repr__(self):

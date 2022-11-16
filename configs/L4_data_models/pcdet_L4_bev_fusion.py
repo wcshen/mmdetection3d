@@ -5,7 +5,7 @@ _base_ = [
 # model settings
 voxel_size = [0.25, 0.25, 8]
 point_cloud_range = [0, -10, -2, 100, 10, 6]
-used_cameras=2
+used_cameras=4
 use_offline_img_feat=True
 used_sensors = {'use_lidar': True,
                'use_camera': True,
@@ -42,7 +42,7 @@ model = dict(
     #     out_channels=64,
     #     accelerate=False,
     # ),
-    img_neck=dict(type='DepthLSSTransform',
+    img_view_transformer=dict(type='LSSTransform',
         in_channels=64,
         out_channels=64,
         image_size=(540, 960),
@@ -194,7 +194,7 @@ train_pipeline = [
     dict(type='PointShuffle'),
     dict(type='DefaultFormatBundle3D', class_names=class_names),
     dict(type='Collect3D', keys=['points', 'img', 'gt_bboxes_3d', 'gt_labels_3d', 
-                                 'img_feature', 'lidar2img', 'lidar2camera', 'camera_intrinsics'])
+                                 'img_feature', 'side_img_feature', 'lidar2img', 'lidar2camera', 'camera_intrinsics'])
 ]
 
 test_pipeline = [
@@ -225,7 +225,7 @@ test_pipeline = [
                 type='DefaultFormatBundle3D',
                 class_names=class_names,
                 with_label=False),
-            dict(type='Collect3D', keys=['points', 'img', 'img_feature', 'lidar2img', 'lidar2camera', 'camera_intrinsics'])
+            dict(type='Collect3D', keys=['points', 'img', 'img_feature', 'side_img_feature', 'lidar2img', 'lidar2camera', 'camera_intrinsics'])
         ])
 ]
 
@@ -295,11 +295,11 @@ optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # PointPillars usually need longer schedule than second, we simply double
 # the training schedule. Do remind that since we use RepeatDataset and
 # repeat factor is 2, so we actually train 160 epochs.
-runner = dict(max_epochs=40)
+runner = dict(max_epochs=80)
 
 # Use evaluation interval=2 reduce the number of evaluation timese
 evaluation = dict(interval=10)
 checkpoint_config = dict(interval=10)
 workflow = [('train', 2), ('val', 1)]
-# resume_from ='/mnt/intel/jupyterhub/mrb/code/mm3d_bevfusion/train_log/mm3d/pcdet_bev_fusion/20221020-095511/epoch_4.pth'
+# resume_from ='/home/rongbo.ma/code/mm3d_bevfusion/work_dirs/L4_data_models/pcdet/l4_lidar_cam_80_epoch/pcdet_L4_bev_fusion/2022-11-10T01-03-35/latest.pth'
 find_unused_parameters=True

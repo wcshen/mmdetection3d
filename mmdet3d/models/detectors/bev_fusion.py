@@ -83,6 +83,7 @@ class BEVFusion(MVXTwoStageDetector):
                       gt_bboxes=None,
                       img=None,
                       img_feature=None,
+                      side_img_feature=None,
                       lidar2img=None,
                       lidar2camera=None, 
                       camera_intrinsics=None,
@@ -93,7 +94,10 @@ class BEVFusion(MVXTwoStageDetector):
                       img_mask=None):
    
         # extract feat
-        img_feats, pts_feats, rad_feats = self.extract_feat(points, img, img_feature, lidar2img, lidar2camera, camera_intrinsics, radar, img_metas)
+        offline_img_features = [img_feature]
+        if side_img_feature is not None:
+            offline_img_features.append(side_img_feature)
+        img_feats, pts_feats, rad_feats = self.extract_feat(points, img, offline_img_features, lidar2img, lidar2camera, camera_intrinsics, radar, img_metas)
         # calculate loss
         losses = dict()
         loss_fused = self.forward_mdfs_train(pts_feats, img_feats, rad_feats, gt_bboxes_3d,
@@ -165,7 +169,9 @@ class BEVFusion(MVXTwoStageDetector):
     def extract_img_feat(self, points, img, offline_img_feat, lidar2img, lidar2camera, camera_intrinsics, img_metas):
         """Extract features of images."""
         if self.use_offline_img_feat:
-            img_feats = offline_img_feat.squeeze(2)
+            img_feats = []
+            for feat in offline_img_feat:
+                img_feats.append(feat.squeeze(2)) # todo
         else:
             if self.with_img_backbone and img is not None:
                 # input_shape = img.shape[-2:]
