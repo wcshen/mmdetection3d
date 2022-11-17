@@ -800,7 +800,8 @@ class LoadPointsFromFile(object):
                  shift_height=False,
                  use_color=False,
                  file_client_args=dict(backend='disk'),
-                 point_type='float32'):
+                 point_type='float32',
+                 using_tele=False):
         self.shift_height = shift_height
         self.use_color = use_color
         if isinstance(use_dim, int):
@@ -816,6 +817,7 @@ class LoadPointsFromFile(object):
         self.file_client = None
 
         self.point_type = point_type
+        self.using_tele = using_tele
 
     def _load_points(self, pts_filename):
         """Private function to load point clouds data.
@@ -864,6 +866,14 @@ class LoadPointsFromFile(object):
         points = points.reshape(-1, self.load_dim)
         points = points[:, self.use_dim]
         attribute_dims = None
+        
+        if self.using_tele:
+            tele_pts_filename = pts_filename.replace("pointcloud", "tele_points")
+            if osp.exists(tele_pts_filename):
+                tele_points = self._load_points(tele_pts_filename)
+                tele_points = tele_points.reshape(-1, self.load_dim)
+                tele_points = tele_points[:, self.use_dim]
+                points = np.concatenate([points, tele_points], axis=0)
 
         if self.shift_height:
             floor_height = np.percentile(points[:, 2], 0.99)
