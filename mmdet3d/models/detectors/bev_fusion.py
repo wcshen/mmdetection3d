@@ -108,7 +108,7 @@ class BEVFusion(MVXTwoStageDetector):
     
     
     def forward_test(self, points, img_metas, img=None, radar=None, 
-                     img_feature=None, lidar2img=None, lidar2camera=None,
+                     img_feature=None, side_img_feature=None, lidar2img=None, lidar2camera=None,
                      camera_intrinsics=None, **kwargs):
         """
         Args:
@@ -138,13 +138,18 @@ class BEVFusion(MVXTwoStageDetector):
             img = [img] if img is None else img
             radar =[radar] if radar is None else radar
             img_feature =[img_feature] if img_feature is None else img_feature
+            side_img_feature =[side_img_feature] if side_img_feature is None else side_img_feature
+            
+            offline_img_features = [img_feature[0]]
+            if side_img_feature is not None:
+                offline_img_features.append(side_img_feature[0])
             lidar2img = [lidar2img] if lidar2img is None else lidar2img
             lidar2camera = [lidar2camera] if lidar2camera is None else lidar2camera
             camera_intrinsics = [camera_intrinsics] if camera_intrinsics  is None else camera_intrinsics
             return self.simple_test(points=points[0], 
                                     img_metas=img_metas[0],
                                     img=img[0], radar=radar[0],
-                                    img_feature=img_feature[0], 
+                                    img_feature=offline_img_features, 
                                     lidar2img=lidar2img[0],
                                     lidar2camera=lidar2camera[0], 
                                     camera_intrinsics=camera_intrinsics[0],
