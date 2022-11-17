@@ -37,6 +37,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Train a detector')
     parser.add_argument('config', help='train config file path')
     parser.add_argument('--work-dir', help='the dir to save logs and models')
+    parser.add_argument('--extra-tag', default='', required=True, help='the dir to save logs and models')
     parser.add_argument(
         '--resume-from', help='the checkpoint file to resume from')
     parser.add_argument(
@@ -131,13 +132,23 @@ def main():
         torch.backends.cudnn.benchmark = True
 
     # work_dir is determined in this priority: CLI > segment in file > filename
-    current_time = "{0:%Y%m%d-%H%M%S}".format(datetime.datetime.now(tz=pytz.timezone("Asia/Chongqing")))
-    pre_path = '/mnt/intel/jupyterhub/swc/train_log/mm3d'
-    data_name = osp.splitext(args.config)[0].split('/')[1]
-    exp_name = osp.splitext(os.path.basename(args.config))[0].split('_')[0]
-    # mm3d/L4/pointpillars/single_head/cfg/time
-    cfg.work_dir = osp.join(pre_path, data_name, exp_name, cfg.extra_tag, osp.splitext(osp.basename(args.config))[0], current_time)
 
+    current_time = "{0:%Y-%m-%dT%H-%M-%S/}".format(datetime.datetime.now(tz=pytz.timezone("Asia/Chongqing")))
+    # args.work_dir example: '/mnt/intel/jupyterhub/xxx/train_log/mm3d'
+    if args.work_dir is not None:
+        # update configs according to cfg_name
+        # one cfg example: configs/L3_data_models/pointpillars/pointpillars_L3_vehicle_160e_p6000_pt8_v_025.py
+        # using extra_tag in the cfg_file to group some exps
+        data_name = osp.splitext(args.config)[0].split('/')[1]
+        exp_name = osp.splitext(os.path.basename(args.config))[0].split('_')[0]
+        # eg: /mnt/intel/jupyterhub/xxx/train_log/mm3d/  L4  /pointpillars  /single_head/  cfg_name   /time
+        cfg.work_dir = osp.join(args.work_dir, data_name, exp_name, args.extra_tag, osp.splitext(osp.basename(args.config))[0], current_time)
+    elif cfg.get('work_dir', None) is None:
+        # use config filename as default work_dir if cfg.work_dir is None
+        work_dirs = './work_dirs/' + current_time
+        cfg.work_dir = osp.join(work_dirs,
+                                osp.splitext(osp.basename(args.config))[0])
+    
     if args.resume_from is not None:
         cfg.resume_from = args.resume_from
 
@@ -227,9 +238,51 @@ def main():
     if cfg.use_sync_bn:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
 
+    if 'freeze_lidar_components' in cfg and cfg['freeze_lidar_components'] is True:
+        logger.info(f"param need to update:")
+        param_grad = []
+        param_nograd = []
+
+        for name, param in model.named_parameters():
+            if 'pts' in name and 'pts_bbox_head' not in name:
+                param.requires_grad = False
+            if 'pts_bbox_head.decoder.0' in name:
+                param.requires_grad = False
+            if 'pts_bbox_head.shared_conv' in name and 'pts_bbox_head.shared_conv_img' not in name:
+                param.requires_grad = False
+            if 'pts_bbox_head.heatmap_head' in name and 'pts_bbox_head.heatmap_head_img' not in name:
+                param.requires_grad = False
+            if 'pts_bbox_head.prediction_heads.0' in name:
+                param.requires_grad = False
+            if 'pts_bbox_head.class_encoding' in name:
+                param.requires_grad = False
+
+        from torch import nn
+
+        def fix_bn(m):
+            if isinstance(m, nn.BatchNorm1d) or isinstance(m, nn.BatchNorm2d):
+                m.track_running_stats = False
+
+        model.pts_voxel_layer.apply(fix_bn)
+        model.pts_voxel_encoder.apply(fix_bn)
+        model.pts_middle_encoder.apply(fix_bn)
+        model.pts_backbone.apply(fix_bn)
+        model.pts_neck.apply(fix_bn)
+        model.pts_bbox_head.heatmap_head.apply(fix_bn)
+        model.pts_bbox_head.shared_conv.apply(fix_bn)
+        model.pts_bbox_head.class_encoding.apply(fix_bn)
+        model.pts_bbox_head.decoder[0].apply(fix_bn)
+        model.pts_bbox_head.prediction_heads[0].apply(fix_bn)
+        for name, param in model.named_parameters():
+            if param.requires_grad is True:
+                logger.info(name)
+                param_grad.append(name)
+            else:
+                param_nograd.append(name)
+
     logger.info(f'Model:\n{model}')
     datasets = [build_dataset(cfg.data.train)]
-    if len(cfg.workflow) == 2:
+    if len(cfg.workflow) == 2: # 如果workflow长度是2，则把val dataset也加上
         val_dataset = copy.deepcopy(cfg.data.val)
         val_dataset.pipeline = cfg.train_pipeline
         # set test_mode=False here in deep copied config

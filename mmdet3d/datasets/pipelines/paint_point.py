@@ -3,6 +3,7 @@ import numpy as np
 from torch.nn import functional as F
 import torch
 import copy
+import random
 
 from mmdet3d.core.points import LiDARPoints
 
@@ -13,9 +14,10 @@ camera_names = ['front_left_camera', 'front_right_camera',
 @PIPELINES.register_module()
 class PaintPointsWithImageFeature:
     
-    def __init__(self, used_cameras=4, avg_flag=True):
+    def __init__(self, used_cameras=4, avg_flag=True, drop_camera_prob=0):
         self.used_cameras = used_cameras
         self.avg_flag = avg_flag
+        self.drop_camera_prob = drop_camera_prob
      
     def get_image_features(self, images_path):
         full_image_features = []
@@ -74,6 +76,9 @@ class PaintPointsWithImageFeature:
             all_camera_features = np.concatenate([front_camera_feature, side_camera_feature], axis=-1)
             
         augmented_lidar = np.concatenate((lidar_raw, all_camera_features), axis=1)
+        if self.drop_camera_prob > 0: 
+            if random.randint(1, self.drop_camera_prob) == 1:
+                augmented_lidar[:,4:] = 0
         augmented_lidar = LiDARPoints(augmented_lidar, points_dim=augmented_lidar.shape[-1])
         results['points'] = augmented_lidar
         return results

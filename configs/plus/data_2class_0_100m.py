@@ -1,9 +1,9 @@
 # dataset settings
 dataset_type = 'PlusKittiDataset'
-data_root = '/mnt/intel/jupyterhub/swc/datasets/pc_label_trainval/CN_L4_origin_data/'
-class_names = ['Pedestrian', 'Cyclist', 'Car', 'Truck']
-point_cloud_range = [-50, -50, -2, 150, 50, 6]
-input_modality = dict(use_lidar=True, use_camera=True)
+data_root = 'data/L4E_origin_data/'
+class_names = ['Car', 'Truck']
+point_cloud_range = [0, -10.0, -2.0, 100.0, 10.0, 6.0]
+input_modality = dict(use_lidar=True, use_camera=False)
 
 file_client_args = dict(backend='disk')
 # Uncomment the following if use ceph or other file clients.
@@ -49,7 +49,6 @@ train_pipeline = [
         with_label_3d=True,
         file_client_args=file_client_args),
     # dict(type='ObjectSample', db_sampler=db_sampler),
-    dict(type='LoadMultiCamImagesFromFile'),
     dict(
         type='ObjectNoise',
         num_try=100,
@@ -64,8 +63,8 @@ train_pipeline = [
     dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='PointShuffle'),
-    dict(type='DefaultFormatBundleMultiCam3D', class_names=class_names),
-    dict(type='Collect3D', keys=['img', 'points', 'gt_bboxes_3d', 'gt_labels_3d'])
+    dict(type='DefaultFormatBundle3D', class_names=class_names),
+    dict(type='Collect3D', keys=['points', 'gt_bboxes_3d', 'gt_labels_3d'])
 ]
 test_pipeline = [
     dict(
@@ -75,7 +74,6 @@ test_pipeline = [
         use_dim=4,
         point_type='float64',
         file_client_args=file_client_args,),
-    dict(type='LoadMultiCamImagesFromFile'),
     dict(
         type='MultiScaleFlipAug3D',
         img_scale=(1333, 800),
@@ -91,10 +89,10 @@ test_pipeline = [
             dict(
                 type='PointsRangeFilter', point_cloud_range=point_cloud_range),
             dict(
-                type='DefaultFormatBundleMultiCam3D',
+                type='DefaultFormatBundle3D',
                 class_names=class_names,
                 with_label=False),
-            dict(type='Collect3D', keys=['img', 'points'])
+            dict(type='Collect3D', keys=['points'])
         ])
 ]
 # construct a pipeline for data and gt loading in show function
@@ -107,20 +105,19 @@ eval_pipeline = [
         use_dim=4,
         point_type='float64',
         file_client_args=file_client_args),
-    dict(type='LoadMultiCamImagesFromFile'),
     dict(
-        type='DefaultFormatBundleMultiCam3D',
+        type='DefaultFormatBundle3D',
         class_names=class_names,
         with_label=False),
-    dict(type='Collect3D', keys=['img', 'points'])
+    dict(type='Collect3D', keys=['points'])
 ]
 
 data = dict(
-    samples_per_gpu=4,
+    samples_per_gpu=8,
     workers_per_gpu=4,
     train=dict(
         type='RepeatDataset',
-        times=2,
+        times=1,
         dataset=dict(
             type=dataset_type,
             data_root=data_root,
@@ -151,8 +148,8 @@ data = dict(
         file_client_args=file_client_args),
     test=dict(
         type=dataset_type,
-        data_root='/mnt/intel/jupyterhub/swc/datasets/pc_label_trainval/CN_L4_origin_benchmark/',
-        ann_file=data_root + 'Kitti_L4_data_mm3d_infos_val.pkl',
+        data_root='data/L4E_origin_benchmark/',
+        ann_file='data/L4E_origin_benchmark/Kitti_L4_data_mm3d_infos_val.pkl',
         split='training',
         pts_prefix='pointcloud',
         pipeline=test_pipeline,

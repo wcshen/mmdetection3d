@@ -1,11 +1,22 @@
 #!/usr/bin/env bash
-CUDA_VISIBLE_DEVICES="4,5,6,7" 
+export NCCL_P2P_DISABLE=1 
+
+
+# CUDA_VISIBLE_DEVICES="1,2,3,4,5,6" \
+# PORT=29509 \
+# bash tools/dist_train.sh \
+# configs/transfusion_plus_pillar_L.py \
+# 6 \
+# --work-dir work_dirs/plus_transfusion \
+# --deterministic
+
+# CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7" 
 function train()
 {
     PORT=30000 \
     bash tools/dist_train.sh \
-    configs/L4_data_models/prefusion_L4_all_class_80e_p32000_pt48_v_025.py \
-    4
+    configs/L3_data_models/pcdet_bev_fusion.py \
+    8 --work-dir work_dirs --extra-tag  debug
 }
 
 function plot_pr_curv()

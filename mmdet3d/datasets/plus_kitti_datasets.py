@@ -7,6 +7,9 @@ from tkinter.messagebox import NO
 from unittest.mock import NonCallableMagicMock
 import cv2
 
+from tkinter.messagebox import NO
+import cv2
+
 import mmcv
 import numpy as np
 import torch
@@ -197,23 +200,34 @@ class PlusKittiDataset(KittiDataset):
 
         img_filenames = []
         lidar2img_list = []
+        lidar2camera_list = []
+        camera_intrinsics_list = []
+
         for camera_name in self.camera_names:
             img_filename = os.path.join(self.root_split, info['image'][camera_name]['image_path'])
             img_filenames.append(img_filename)
 
-            rect = info['calib'][camera_name]['R0_rect'].astype(np.float64)
-            Trv2c = info['calib'][camera_name]['Tr_velo_to_cam'].astype(np.float64)
-            P2 = info['calib'][camera_name]['P2'].astype(np.float64)
-            lidar2img = np.dot(P2, rect)
+            rect = info['calib'][camera_name]['R0_rect'].astype(np.float64) # 外参
+            Trv2c = info['calib'][camera_name]['Tr_velo_to_cam'].astype(np.float64) # eye() 没有用到
+            P2 = info['calib'][camera_name]['P2'].astype(np.float64) # 内参
+            lidar2img = np.dot(P2, rect) #
 
             lidar2img_list.append(lidar2img)
+            lidar2camera_list.append(rect)
+            camera_intrinsics_list.append(P2)
 
+        lidar2img_list = np.stack(lidar2img_list, axis=0)
+        lidar2camera_list = np.stack(lidar2camera_list, axis=0)
+        camera_intrinsics_list = np.stack(camera_intrinsics_list, axis=0)
+        
         input_dict = dict(
             sample_idx=sample_idx,
             pts_filename=pts_filename,
             camera_names=self.camera_names,
             img_info=img_filenames,
-            lidar2img=lidar2img_list)
+            lidar2img=lidar2img_list,
+            lidar2camera=lidar2camera_list,
+            camera_intrinsics=camera_intrinsics_list)
 
         if not self.test_mode:
             annos = self.get_ann_info(index)
@@ -392,7 +406,7 @@ class PlusKittiDataset(KittiDataset):
         img_shape = info['image']['front_left_camera']['image_shape']
         P2 = box_preds.tensor.new_tensor(P2)
 
-        box_preds_camera = box_preds.convert_to(Box3DMode.CAM, rect @ Trv2c)
+        box_preds_camera = box_preds.convert_to(Box3DMode.CAM, rect @ Trv2c) # todo bug
 
         box_corners = box_preds_camera.corners
         box_corners_in_image = points_cam2img(box_corners, P2)
@@ -463,13 +477,14 @@ class PlusKittiDataset(KittiDataset):
         for idx, pred_dicts in enumerate(
                 mmcv.track_iter_progress(net_outputs)):
             annos = []
-            info = self.data_infos[idx]
-            sample_idx = info['image']['image_idx']
             anno = {
                     'dt_boxes': [],
                     'name': [],
                     'scores': []
             }
+            if 'pts_bbox' in pred_dicts:
+                pred_dicts = pred_dicts['pts_bbox']
+                
             if len(pred_dicts['boxes_3d']) > 0:
                 scores = pred_dicts['scores_3d']
                 box_preds_lidar = pred_dicts['boxes_3d']
@@ -510,9 +525,10 @@ class PlusKittiDataset(KittiDataset):
                  show=False,
                  out_dir=None,
                  pipeline=None,
+                 plot_dt_result=False,
                  eval_result_dir=None,
                  eval_file_tail=None,
-                 test_flag=False):
+                 bag_test_flag=False):
         """Evaluation in KITTI protocol.
 
         Args:
@@ -539,35 +555,41 @@ class PlusKittiDataset(KittiDataset):
         """
         result_dict = None
         from mmdet3d.core.evaluation import get_formatted_results
-        det_pcdet = self.bbox2result_pcdet(results, self.CLASSES, pklfile_prefix)
-        if(not test_flag):
-            # to pcdet format
-            self.eval_cnt+=10
-            if eval_file_tail:
-                eval_cnt = eval_file_tail
-            else:
-                eval_cnt = self.eval_cnt
+        
+        dets_pcdet = self.bbox2result_pcdet(results, self.CLASSES, pklfile_prefix)
+        
+        # test bag 
+        if bag_test_flag:
+            self.save_eval_results(dets_pcdet, out_dir) # todo
+            return result_dict
             
-            gt_annos_pcdet = []
-            for info in self.data_infos:
-                gt_boxes = info['annos']['gt_boxes_lidar'] 
-                gt_names = info['annos']['name'] 
-                gt_anno = {'gt_boxes': gt_boxes, 'name': gt_names}
-                gt_annos_pcdet.append(gt_anno)
+        # to pcdet format
+        self.eval_cnt+=10
+        if eval_file_tail:
+            eval_cnt = eval_file_tail
+        else:
+            eval_cnt = self.eval_cnt
+        
+        gt_annos_pcdet = []
+        for info in self.data_infos:
+            gt_boxes = info['annos']['gt_boxes_lidar'] 
+            gt_names = info['annos']['name'] 
+            gt_anno = {'gt_boxes': gt_boxes, 'name': gt_names}
+            gt_annos_pcdet.append(gt_anno)
 
-            result_str, result_dict = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, det_pcdet, eval_result_dir, eval_cnt)
-            
-            print_log('\n' + '****************pcdet eval start.*****************', logger=logger)
-            print_log('\n' + result_str, logger=logger)
-            print_log('\n' + '****************pcdet eval done.*****************', logger=logger)
+        result_str, result_dict = get_formatted_results(self.pcd_limit_range, self.CLASSES, gt_annos_pcdet, dets_pcdet, eval_result_dir, eval_cnt)
+        
+        print_log('\n' + '****************pcdet eval start.*****************', logger=logger)
+        print_log('\n' + result_str, logger=logger)
+        print_log('\n' + '****************pcdet eval done.*****************', logger=logger)
 
-            eval_file_name = f'human_readable_results_{eval_cnt}.txt'
-            
-            if eval_result_dir is not None:
-                with open(os.path.join(eval_result_dir, eval_file_name), 'w') as f:
-                    f.write(result_str)
-        if show:
-            self.save_eval_results(det_pcdet, out_dir)
+        eval_file_name = f'human_readable_results_{eval_cnt}.txt'
+        
+        if eval_result_dir is not None:
+            with open(os.path.join(eval_result_dir, eval_file_name), 'w') as f:
+                f.write(result_str)
+        if plot_dt_result:
+            self.save_eval_results(dets_pcdet, out_dir) # todo
         return result_dict
     
     @staticmethod

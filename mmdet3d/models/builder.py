@@ -17,6 +17,7 @@ MODELS = Registry('models', parent=MMCV_MODELS)
 
 BACKBONES = MODELS
 NECKS = MODELS
+VTRANSFORMS = MODELS
 ROI_EXTRACTORS = MODELS
 SHARED_HEADS = MODELS
 HEADS = MODELS
@@ -43,6 +44,12 @@ def build_neck(cfg):
     else:
         return MMDET_NECKS.build(cfg)
 
+def build_vtransforms(cfg):
+    """Build vtransforms."""
+    if cfg['type'] in VTRANSFORMS._module_dict.keys():
+        return VTRANSFORMS.build(cfg)
+    else:
+        return MMDET_NECKS.build(cfg)
 
 def build_roi_extractor(cfg):
     """Build RoI feature extractor."""

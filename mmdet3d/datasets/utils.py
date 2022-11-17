@@ -219,6 +219,8 @@ def draw_boxes_on_canvas(canvas, boxes, bev_range, scores=None, label_strings=No
     box_centers[:, 0] = height - box_centers[:, 0] 
     box_centers[:, 1] = width - box_centers[:, 1] 
     for idx, box in enumerate(boxes):
+        # if scores is not None and scores[idx] < 0.1:
+        #     continue
         box2d = get_corners_2d(box)
         box2d[:, 0] -= bev_range[0]
         box2d[:, 1] -= bev_range[1]
