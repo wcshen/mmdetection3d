@@ -17,8 +17,6 @@ def parse_config():
                         help='specify the config of model')
     parser.add_argument('--ckpt', type=str, default=None,
                         help='checkpoint to start from')
-    parser.add_argument('--do_cnn', action='store_true',
-                        help='use cnn instead of max pooling')
     args = parser.parse_args()
 
     cfg = Config.fromfile(args.cfg_file)
@@ -39,16 +37,13 @@ def main():
     vfe_cfg = cfg.model.voxel_encoder
     backbone_cfg = cfg.model.backbone
     head_cfg = cfg.model.bbox_head
-    model_setting = cfg.model
     # Build up models
     vfe_model = PillarFeatureNet(in_channels=vfe_cfg.in_channels,
                                  feat_channels=vfe_cfg.feat_channels,
                                  with_distance=vfe_cfg.with_distance,
-                                 voxel_size=cfg.voxel_size,
-                                 use_pcdet=vfe_cfg.use_pcdet,
-                                 point_cloud_range=vfe_cfg.point_cloud_range)
+                                 use_pcdet=vfe_cfg.use_pcdet)
 
-    rpn_model = RPN(backbone_cfg=backbone_cfg, head_cfg=head_cfg, model_setting=model_setting)
+    rpn_model = RPN(backbone_cfg=backbone_cfg, head_cfg=head_cfg)
 
     with torch.no_grad():
         checkpoint = torch.load(args.ckpt)
@@ -82,11 +77,11 @@ def main():
         
         vfe_onnx_model = onnx.load(pfe_model_file)
         onnx.checker.check_model(vfe_onnx_model)
-        onnx_vfe_session = onnxruntime.InferenceSession(pfe_model_file)
+        onnx_vfe_session = onnxruntime.InferenceSession(pfe_model_file, providers=['CUDAExecutionProvider'])
         onnx_vfe_input_name = onnx_vfe_session.get_inputs()[0].name
         onnx_vfe_output_name = [onnx_vfe_session.get_outputs()[0].name]
         vfe_out_onnx = onnx_vfe_session.run(onnx_vfe_output_name, {onnx_vfe_input_name: vfe_input.detach().cpu().numpy()})
-
+        print(f"vfe_out_shape: {len(vfe_out_onnx)}")
         # np.testing.assert_allclose(vfe_out_torch.detach().cpu().numpy(), vfe_out_onnx[0], rtol=1e-03, atol=1e-04)
         print("[SUCCESS] PFE ONNX model validated.")
 
@@ -98,20 +93,20 @@ def main():
         
         rpn_onnx_model = onnx.load(rpn_model_file)
         onnx.checker.check_model(rpn_onnx_model)
-        onnx_rpn_session = onnxruntime.InferenceSession(rpn_model_file)
+        onnx_rpn_session = onnxruntime.InferenceSession(rpn_model_file, providers=['TensorrtExecutionProvider', 'CUDAExecutionProvider', 'CPUExecutionProvider'])
         onnx_rpn_input_name = onnx_rpn_session.get_inputs()[0].name
         onnx_rpn_output_name = [onnx_rpn_session.get_outputs()[0].name,
                                 onnx_rpn_session.get_outputs()[1].name,
                                 onnx_rpn_session.get_outputs()[2].name]
         rpn_out_onnx = onnx_rpn_session.run(onnx_rpn_output_name, {onnx_rpn_input_name: rpn_input.detach().cpu().numpy()})
 
-        np.testing.assert_allclose(rpn_out_torch[0][0].detach().cpu().numpy(), rpn_out_onnx[0], rtol=1e-03, atol=1e-04)
-        np.testing.assert_allclose(rpn_out_torch[1][0].detach().cpu().numpy(), rpn_out_onnx[1], rtol=1e-03, atol=1e-04)
-        np.testing.assert_allclose(rpn_out_torch[2][0].detach().cpu().numpy(), rpn_out_onnx[2], rtol=1e-03, atol=1e-04)
+        np.testing.assert_allclose(rpn_out_torch[0].detach().cpu().numpy(), rpn_out_onnx[0], rtol=1e-03, atol=1e-04)
+        np.testing.assert_allclose(rpn_out_torch[1].detach().cpu().numpy(), rpn_out_onnx[1], rtol=1e-03, atol=1e-04)
+        np.testing.assert_allclose(rpn_out_torch[2].detach().cpu().numpy(), rpn_out_onnx[2], rtol=1e-03, atol=1e-04)
         print("[SUCCESS] RPN ONNX model validated.")
 
 
 if __name__ == '__main__':
-    pfe_model_file = "./tools/export_onnx/pfe.onnx"
-    rpn_model_file = "./tools/export_onnx/rpn.onnx"
+    pfe_model_file = "./tools/export_onnx/mm3d_all_prefusion_p32000_pt48_v_032_pfe.onnx"
+    rpn_model_file = "./tools/export_onnx/mm3d_all_prefusion_p32000_pt48_v_032_rpn.onnx"
     main()
