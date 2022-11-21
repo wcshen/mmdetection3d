@@ -14,8 +14,6 @@ def parse_config():
                         help='specify the config of model')
     parser.add_argument('--ckpt', type=str, default=None,
                         help='checkpoint to start from')
-    parser.add_argument('--do_cnn', action='store_true',
-                        help='use cnn instead of max pooling')
     args = parser.parse_args()
 
     cfg = Config.fromfile(args.cfg_file)
@@ -36,16 +34,13 @@ def main():
     vfe_cfg = cfg.model.voxel_encoder
     backbone_cfg = cfg.model.backbone
     head_cfg = cfg.model.bbox_head
-    model_setting = cfg.model
     # Build up models
     vfe_model = PillarFeatureNet(in_channels=vfe_cfg.in_channels,
                                  feat_channels=vfe_cfg.feat_channels,
                                  with_distance=vfe_cfg.with_distance,
-                                 voxel_size=cfg.voxel_size,
-                                 use_pcdet=vfe_cfg.use_pcdet,
-                                 point_cloud_range=vfe_cfg.point_cloud_range)
+                                 use_pcdet=vfe_cfg.use_pcdet)
 
-    rpn_model = RPN(backbone_cfg=backbone_cfg, head_cfg=head_cfg, model_setting=model_setting)
+    rpn_model = RPN(backbone_cfg=backbone_cfg, head_cfg=head_cfg)
 
     with torch.no_grad():
         checkpoint = torch.load(args.ckpt)
@@ -58,11 +53,18 @@ def main():
         rpn_update_model_state = {}
         vfe_state_dict = vfe_model.state_dict()
         rpn_state_dict = rpn_model.state_dict()
+        
+        
+        a,v,r = 0,0,0
         for key, val in model_state_disk.items():
             if key[14:] in vfe_state_dict and vfe_state_dict[key[14:]].shape == model_state_disk[key].shape:
                 vfe_update_model_state[key[14:]] = val
+                v+=1
             if key in rpn_state_dict and rpn_state_dict[key].shape == model_state_disk[key].shape:
                 rpn_update_model_state[key] = val
+                r+=1
+            a+=1
+        print(f"a:{a} v:{v} r: {r}")
 
         vfe_state_dict.update(vfe_update_model_state)
         vfe_model.load_state_dict(vfe_state_dict)
@@ -76,13 +78,15 @@ def main():
 
         # ###################################### Convert VFE model to ONNX ######################################
         # VFE input: max_num_pillars, max_num_points_per_pillar, point_features
+        # lidar_only: [1, max_num_pillars, max_num_points_per_pillar, 10]
+        # prefusion: [1, max_num_pillars, max_num_points_per_pillar, 74]
         vfe_input = torch.ones(
             [1, max_num_pillars, max_num_points_per_pillar, 74], dtype=torch.float32, device=torch.device('cuda:0'))
 
         vfe_input_names = ['vfe_input']
         vfe_output_names = ['pillar_features']
-        output_onnx_file = './tools/export_onnx/pfe.onnx'
-        torch.onnx.export(vfe_model, vfe_input, output_onnx_file, verbose=True,
+        output_onnx_file = './tools/export_onnx/mm3d_all_prefusion_p32000_pt48_v_032_pfe.onnx'
+        torch.onnx.export(vfe_model, vfe_input, output_onnx_file, verbose=False,
                           input_names=vfe_input_names, output_names=vfe_output_names)
         print("[SUCCESS] PFE model is converted to ONNX.")
 
@@ -92,8 +96,8 @@ def main():
             [1, num_bev_features, grid_size[0], grid_size[1]], dtype=torch.float32, device=torch.device('cuda:0'))
         rpn_input_names = ['spatial_features']
         rpn_output_names = ['cls_preds', 'box_preds', 'dir_cls_preds']
-        output_onnx_file = './tools/export_onnx/rpn.onnx'
-        torch.onnx.export(rpn_model, rpn_input, output_onnx_file, verbose=True,
+        output_onnx_file = './tools/export_onnx/mm3d_all_prefusion_p32000_pt48_v_032_rpn.onnx'
+        torch.onnx.export(rpn_model, rpn_input, output_onnx_file, verbose=False,
                           input_names=rpn_input_names, output_names=rpn_output_names)
         print("[SUCCESS] RPN model is converted to ONNX.")
 
