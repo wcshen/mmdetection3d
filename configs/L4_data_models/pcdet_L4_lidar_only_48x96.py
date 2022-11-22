@@ -3,25 +3,28 @@ _base_ = [
 ]
 using_tele=False
 # model settings
-voxel_size = [0.32, 0.32, 8]
-point_cloud_range = [-50, -51.2, -2, 154.8, 51.2, 6]
+voxel_size = [0.4, 0.4, 8] # 120*240
+point_cloud_range = [-24, -24, -2, 72, 24, 6]
+
 use_sync_bn=True
 used_cameras = 4
 use_offline_img_feat=True
-used_sensors = {'use_lidar': False,
-               'use_camera': True,
+used_sensors = {'use_lidar': True,
+               'use_camera': False,
                'use_radar': False}
 grid_config = {
     'x': [point_cloud_range[0], point_cloud_range[3], voxel_size[0]],
     'y': [point_cloud_range[1], point_cloud_range[4], voxel_size[1]],
     'z': [-10.0, 10.0, 20.0],
-    'depth': [1.0, 100.0, 1],
+    'depth': [1.0, 72, 1],
 }
 bev_grid_map_size = [
     int((grid_config['y'][1] - grid_config['y'][0]) / voxel_size[1]),
     int((grid_config['x'][1] - grid_config['x'][0]) / voxel_size[0]),
     ]
-
+feat_channel = 0
+if used_sensors['use_lidar']: feat_channel+=64 
+if used_sensors['use_camera']: feat_channel+=64 
 
 model = dict(
     type='BEVFusion',
@@ -54,7 +57,7 @@ model = dict(
         dbound=grid_config['depth'],
         ),
     pts_voxel_layer=dict(
-        max_num_points=48,  # max_points_per_voxel
+        max_num_points=24,  # max_points_per_voxel
         point_cloud_range=point_cloud_range,
         voxel_size=voxel_size,
         max_voxels=(32000, 32000)  # (training, testing) max_voxels
@@ -71,10 +74,10 @@ model = dict(
         type='PointPillarsScatter', in_channels=64, output_shape=bev_grid_map_size),
     pts_backbone=dict(
         type='PcdetBackbone',
-        in_channels=64,
+        in_channels=feat_channel,
         layer_nums=[3, 5, 5],
         layer_strides=[2, 2, 2],
-        num_filters=[64, 128, 256],
+        num_filters=[feat_channel, 128, 256],
         upsample_strides=[1, 2, 4],
         num_upsample_filters=[128, 128, 128],
         ),
@@ -88,10 +91,10 @@ model = dict(
         anchor_generator=dict(
             type='AlignedAnchor3DRangeGenerator',
             ranges=[
-                [-50, -51.2, -0.4, 154.8, 51.2, -0.4],
-                [-50, -51.2, -0.4, 154.8, 51.2, -0.4],
-                [-50, -51.2, -0.4, 154.8, 51.2, -0.4],
-                [-50, -51.2, -0.6, 154.8, 51.2, -0.6]
+                [point_cloud_range[0], point_cloud_range[1], -0.4, point_cloud_range[3], point_cloud_range[4], -0.4],
+                [point_cloud_range[0], point_cloud_range[1], -0.4, point_cloud_range[3], point_cloud_range[4], -0.4],
+                [point_cloud_range[0], point_cloud_range[1], -0.4, point_cloud_range[3], point_cloud_range[4], -0.4],
+                [point_cloud_range[0], point_cloud_range[1], -0.6, point_cloud_range[3], point_cloud_range[4], -0.6],
             ],
             sizes=[[0.8, 0.6, 1.73], # ped
                    [1.76, 0.6, 1.73], # cyclist
@@ -316,8 +319,8 @@ concat_train_data = dict(
     ]
 )
 data = dict(
-    samples_per_gpu=4, # ?
-    workers_per_gpu=4,
+    samples_per_gpu=8, # ?
+    workers_per_gpu=8,
     train=dict(
         type='RepeatDataset',
         times=2,
@@ -353,17 +356,17 @@ data = dict(
         file_client_args=file_client_args))
 # In practice PointPillars also uses a different schedule
 # optimizer
-lr = 0.0004
+lr = 0.0008
 optimizer = dict(lr=lr)
 # max_norm=35 is slightly better than 10 for PointPillars in the earlier
 # development of the codebase thus we keep the setting. But we does not
 # specifically tune this parameter.
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
-runner = dict(max_epochs=80)
+runner = dict(max_epochs=40)
 
 # Use evaluation interval=2 reduce the number of evaluation timese
-evaluation = dict(interval=1)
-checkpoint_config = dict(interval=10)
+evaluation = dict(interval=5)
+checkpoint_config = dict(interval=1)
 workflow = [('train', 2), ('val', 1)]
 # resume_from ='work_dirs/L4_data_models/pcdet/lidar_only/pcdet_L4_bev_fusion_align_with_prefusion/2022-11-17T14-40-31/epoch_10.pth'
 find_unused_parameters=True
