@@ -89,7 +89,7 @@ class PlusKittiDataset(KittiDataset):
         if hasattr(self, 'flag'):
             self.flag = self.flag[::load_interval]
 
-        self.camera_names = ['front_left_camera', 'front_right_camera',
+        self.camera_names = ['front_left_camera', 
                              'side_left_camera', 'side_right_camera',
                              'rear_left_camera', 'rear_right_camera']
         self.camera_names =self.camera_names[:used_cameras]
@@ -588,7 +588,7 @@ class PlusKittiDataset(KittiDataset):
     
     def save_eval_results(self, dets_pcdet, results_dir):
         from .utils import plot_gt_det_cmp
-        
+        print(f"in save_eval_results")
         for i, result in enumerate(dets_pcdet):
             idx = result['idx']
             data_info = self.data_infos[idx]

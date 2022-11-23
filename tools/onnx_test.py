@@ -69,12 +69,12 @@ def get_paddings_indicator(actual_num, max_num, axis=0):
 
 
 def point_augment(features, num_points, coors):
-    vx = 0.25
-    vy = 0.25
+    vx = 0.32
+    vy = 0.32
     vz = 8.0
-    x_offset = vx / 2 + 0
-    y_offset = vy / 2 -10
-    z_offset = vz / 2 -2
+    x_offset = vx / 2 - 50
+    y_offset = vy / 2 - 51.2
+    z_offset = vz / 2 - 2
     features_ls = [features]
     # Find distance of x, y, and z from cluster center
     points_mean = features[:, :, :3].sum(
@@ -82,18 +82,16 @@ def point_augment(features, num_points, coors):
             -1, 1, 1)
     f_cluster = features[:, :, :3] - points_mean
     features_ls.append(f_cluster)
-
+    
     # Find distance of x, y, and z from pillar center
-    f_center = features[:, :, :3]
-    f_center[:, :, 0] = f_center[:, :, 0] - (
-        coors[:, 3].type_as(features).unsqueeze(1) * vx +
-        x_offset)
-    f_center[:, :, 1] = f_center[:, :, 1] - (
-        coors[:, 2].type_as(features).unsqueeze(1) * vy +
-        y_offset)
-    f_center[:, :, 2] = f_center[:, :, 2] - (
-        coors[:, 1].type_as(features).unsqueeze(1) * vz +
-        z_offset)
+    dtype = features.dtype
+    f_center = torch.zeros_like(features[:, :, :3])
+    f_center[:, :, 0] = features[:, :, 0] - (
+        coors[:, 3].to(dtype).unsqueeze(1) * vx + x_offset)
+    f_center[:, :, 1] = features[:, :, 1] - (
+        coors[:, 2].to(dtype).unsqueeze(1) * vy + y_offset)
+    f_center[:, :, 2] = features[:, :, 2] - (
+        coors[:, 1].to(dtype).unsqueeze(1) * vz + z_offset)
     features_ls.append(f_center)
 
     # Combine together feature decorations
@@ -219,8 +217,8 @@ def onnx_inference(cfg, data_loader):
     print(f"====================== {onnx_rpn_output_name}")
     
     voxel_layer = Voxelization(**cfg.model.voxel_layer)
-    middle_layer = PointPillarsScatter(in_channels=64, output_shape=[80, 400])
-    head = Anchor3DHead(num_classes=2,
+    middle_layer = PointPillarsScatter(in_channels=64, output_shape=[320, 640])
+    head = Anchor3DHead(num_classes=4,
                         in_channels=384,
                         train_cfg=cfg.model.train_cfg,
                         test_cfg=cfg.model.test_cfg,
@@ -254,13 +252,18 @@ def onnx_inference(cfg, data_loader):
         voxel_features = point_augment(voxels, num_points, coors_batch)
         voxel_features = voxel_features.unsqueeze(dim=0)
         # print(f"shape: {voxel_features.shape} batch size: {batch_size}")
-        if voxel_features.shape[1] != 6000:
-            continue
+        if voxel_features.shape[1] != 32000:
+            print(f"voxel_num: {voxel_features.shape[1]}")
+            this_voxel_size = voxel_features.shape[1]
+            this_pad_size = 32000 - this_voxel_size
+            this_zeros = torch.zeros(size=(1, this_pad_size, 48, 74))
+            voxel_features = torch.concat([voxel_features, this_zeros], dim=1)
         s = time.time()
         vfe_out_onnx = onnx_vfe_session.run(onnx_vfe_output_name, {onnx_vfe_input_name: voxel_features.detach().cpu().numpy()})
         e = time.time()
         t1 = (e - s) * 1000.0
-        middle_input = torch.from_numpy(vfe_out_onnx[0]).float().cuda()
+        middle_input = torch.from_numpy(vfe_out_onnx[0][:,:this_voxel_size,...]).float().cuda()
+        middle_input = torch.squeeze(middle_input)
         print(f"===================== middle_input: {middle_input.shape}")
         pseudo_image = middle_layer(middle_input, coors_batch, batch_size)
         s = time.time()
@@ -271,6 +274,9 @@ def onnx_inference(cfg, data_loader):
         cls_pred = torch.from_numpy(rpn_out_onnx[0]).permute(0,3,1,2)
         box_pred = torch.from_numpy(rpn_out_onnx[1]).permute(0,3,1,2)
         dir_pred = torch.from_numpy(rpn_out_onnx[2]).permute(0,3,1,2)
+        
+        print(f"cls_pred: {cls_pred.shape}, box_pred: {box_pred.shape}, dir_pred: {dir_pred.shape}")
+        
         cls_preds = [cls_pred.float().cuda()]
         box_preds = [box_pred.float().cuda()]
         dir_cls = [dir_pred.float().cuda()]
@@ -287,7 +293,6 @@ def onnx_inference(cfg, data_loader):
             for bboxes, scores, labels in bbox_list
         ]
         print(f"========== bbox_results: {len(bbox_results)}")
-        # print(bbox_results)
         # idx_out = dict(idx=i, bbox=)
         onnx_results.extend(bbox_results)
     return onnx_results
@@ -295,21 +300,8 @@ def onnx_inference(cfg, data_loader):
 def main():
     args = parse_args()
 
-    assert args.out or args.eval or args.format_only or args.show \
-        or args.show_dir or args.plot_result or args.plus_eval, \
-        ('Please specify at least one operation (save/eval/format/show the '
-         'results / save the results) with the argument "--out", "--eval"'
-         ', "--format-only", "--show" or "--show-dir"')
-
-    if args.eval and args.format_only:
-        raise ValueError('--eval and --format_only cannot be both specified')
-
-    if args.out is not None and not args.out.endswith(('.pkl', '.pickle')):
-        raise ValueError('The output file must be a pkl file.')
 
     cfg = Config.fromfile(args.config)
-    if args.cfg_options is not None:
-        cfg.merge_from_dict(args.cfg_options)
 
     cfg = compat_cfg(cfg)
 
@@ -434,7 +426,7 @@ def main():
             base_dir = os.path.split(args.checkpoint)[0]
             save_path = os.path.join(base_dir, 'single_eval', ckpt_name)
             os.makedirs(save_path, exist_ok=True)
-            plot_save_dir = os.path.join(save_path, 'plot_results')
+            plot_save_dir = os.path.join(save_path, 'onnx_plot_results')
             os.makedirs(plot_save_dir, exist_ok=True)
             eval_kwargs.update(dict(eval_file_tail=eval_file_tail,
                                     eval_result_dir=save_path,
@@ -446,6 +438,6 @@ def main():
 
 
 if __name__ == '__main__':
-    pfe_model_file = './tools/export_onnx/mm3d_pps_pfe.onnx'
-    rpn_model_file = './tools/export_onnx/mm3d_pps_rpn.onnx'
+    pfe_model_file = './tools/export_onnx/mm3d_all_classes_3cam_prefusion_p32000_pt48_v_032_pfe.onnx'
+    rpn_model_file = './tools/export_onnx/mm3d_all_classes_3cam_prefusion_p32000_pt48_v_032_rpn.onnx'
     main()
