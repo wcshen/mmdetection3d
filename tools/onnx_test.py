@@ -30,6 +30,8 @@ from torch.nn import functional as F
 from mmdet3d.core import bbox3d2result, voxel
 import time
 
+import numpy as np
+
 if mmdet.__version__ > '2.23.0':
     # If mmdet version > 2.23.0, setup_multi_processes would be imported and
     # used from mmdet instead of mmdet3d.
@@ -96,6 +98,7 @@ def point_augment(features, num_points, coors):
 
     # Combine together feature decorations
     features = torch.cat(features_ls, dim=-1)
+    features[:,:,3] = 0
     voxel_count = features.shape[1]
     mask = get_paddings_indicator(num_points, voxel_count, axis=0)
     mask = torch.unsqueeze(mask, -1).type_as(features)
@@ -200,7 +203,7 @@ def parse_args():
     return args
 
 
-def onnx_inference(cfg, data_loader):
+def onnx_inference(cfg, data_loader, using_cpp=False):
     vfe_onnx_model = onnx.load(pfe_model_file)
     onnx.checker.check_model(vfe_onnx_model)
     onnx_vfe_session = onnxruntime.InferenceSession(pfe_model_file, providers=['CUDAExecutionProvider'])
@@ -234,9 +237,19 @@ def onnx_inference(cfg, data_loader):
                         init_cfg=None)
     onnx_results = []
     for idx, data in enumerate(data_loader):
+
         voxels, coors, num_points = [], [], []
-        for res in data['points']:
-            points = res.data[0][0]
+        if not using_cpp:
+            for res in data['points']:
+                points = res.data[0][0]
+                res_voxels, res_coors, res_num_points = voxel_layer(points)
+                voxels.append(res_voxels)
+                coors.append(res_coors)
+                num_points.append(res_num_points)
+        else:
+            this_point_path = painted_point_dir + painted_point_paths[idx]
+            points = np.loadtxt(this_point_path).reshape(-1, 68).astype(np.float32)
+            points = torch.from_numpy(points)
             res_voxels, res_coors, res_num_points = voxel_layer(points)
             voxels.append(res_voxels)
             coors.append(res_coors)
@@ -270,7 +283,8 @@ def onnx_inference(cfg, data_loader):
         rpn_out_onnx = onnx_rpn_session.run(onnx_rpn_output_name, {onnx_rpn_input_name: pseudo_image.detach().cpu().numpy()})
         e = time.time()
         t2 = (e - s) * 1000.0
-        print(f"v_t: {t1:.2f} r_t: {t2:.2f} a_t: {t1+t2:.2f}")
+
+        # print(f"v_t: {t1:.2f} r_t: {t2:.2f} a_t: {t1+t2:.2f}")
         cls_pred = torch.from_numpy(rpn_out_onnx[0]).permute(0,3,1,2)
         box_pred = torch.from_numpy(rpn_out_onnx[1]).permute(0,3,1,2)
         dir_pred = torch.from_numpy(rpn_out_onnx[2]).permute(0,3,1,2)
@@ -393,7 +407,8 @@ def main():
         # outputs = multi_gpu_test(model, data_loader, args.tmpdir,
         #                          args.gpu_collect)
     # print(outputs[0])
-    onnx_outputs = onnx_inference(cfg, data_loader)
+    print(f"show: {args.show}")
+    onnx_outputs = onnx_inference(cfg, data_loader, using_cpp=False)
     # print(len(onnx_outputs))
     rank, _ = get_dist_info()
     if rank == 0:
@@ -426,7 +441,7 @@ def main():
             base_dir = os.path.split(args.checkpoint)[0]
             save_path = os.path.join(base_dir, 'single_eval', ckpt_name)
             os.makedirs(save_path, exist_ok=True)
-            plot_save_dir = os.path.join(save_path, 'onnx_plot_results')
+            plot_save_dir = os.path.join(save_path, 'prefusion_onnx_plot_results')
             os.makedirs(plot_save_dir, exist_ok=True)
             eval_kwargs.update(dict(eval_file_tail=eval_file_tail,
                                     eval_result_dir=save_path,
@@ -437,7 +452,29 @@ def main():
             print(dataset.evaluate(onnx_outputs, **eval_kwargs))
 
 
+def vis_pseudoimage():
+    import cv2
+    for img_path in pseudo_image_paths:
+        this_pseudo_image_path = pseudo_image_dir + img_path
+        pseudo_image = np.loadtxt(this_pseudo_image_path).reshape(1, 64, 320, 640).astype(np.float32)
+        single_level = pseudo_image[:,0,...].reshape(320, 640)
+        pos_idx = single_level > 0
+        single_level[pos_idx] = 255
+        cv2.namedWindow('1', 0)
+        cv2.imshow('1', single_level)
+        cv2.waitKey(0)
+
 if __name__ == '__main__':
+    pseudo_image_dir = "/mnt/intel/jupyterhub/swc/onnx_input/pseudo_images/"
+    pseudo_image_paths = os.listdir(pseudo_image_dir)
+    pseudo_image_paths.sort()
+    pseudo_image_paths = pseudo_image_paths[1:]
+    
+    painted_point_dir = "/mnt/intel/jupyterhub/swc/onnx_input/painted_points/"
+    painted_point_paths = os.listdir(painted_point_dir)
+    painted_point_paths.sort()
+    painted_point_paths = painted_point_paths[1:]
+    
     pfe_model_file = './tools/export_onnx/mm3d_all_classes_3cam_prefusion_p32000_pt48_v_032_pfe.onnx'
     rpn_model_file = './tools/export_onnx/mm3d_all_classes_3cam_prefusion_p32000_pt48_v_032_rpn.onnx'
     main()

@@ -490,6 +490,7 @@ class PlusKittiDataset(KittiDataset):
                     'dt_boxes': np.zeros([0, 7]),
                     'name': np.array([]),
                     'scores': np.array([]),
+                    'idx': 0
                 }
                 annos.append(anno)
 
@@ -590,6 +591,7 @@ class PlusKittiDataset(KittiDataset):
         from .utils import plot_gt_det_cmp
         print(f"in save_eval_results")
         for i, result in enumerate(dets_pcdet):
+            print(result.keys())
             idx = result['idx']
             data_info = self.data_infos[idx]
             pts_path = data_info['point_cloud']['lidar_idx']
