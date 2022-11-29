@@ -282,10 +282,11 @@ class DefaultFormatBundleMultiCam3D(object):
     - gt_labels: (1)to tensor, (2)to DataContainer
     """
 
-    def __init__(self, class_names, with_gt=True, with_label=True):
+    def __init__(self, class_names, with_gt=True, with_label=True, stack_image_feature=True):
         self.class_names = class_names
         self.with_gt = with_gt
         self.with_label = with_label
+        self.stack_image_feature = stack_image_feature
 
     def _format_multi_cam_imgs(self, results):
         for idx, np_img in enumerate(results['img']):

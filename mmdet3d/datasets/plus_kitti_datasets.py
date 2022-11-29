@@ -1,4 +1,5 @@
 import copy
+import json
 from json import detect_encoding
 import os
 import tempfile
@@ -448,6 +449,16 @@ class PlusKittiDataset(KittiDataset):
         
         return cam_anno
     
+    def save_dts_to_dict(self, index, dts, dts_dict):
+        info = self.data_infos[index]
+        sample_idx = info['point_cloud']['lidar_idx']
+        t_int = int(sample_idx.split('.')[1])
+        t_float = int(sample_idx.split('.')[2])*1e-6
+        time_stamp = t_int + t_float
+        dts_dict[time_stamp] = dict(dt_boxes=dts['dt_boxes'],
+                                    name=dts['name'],
+                                    score=dts['scores'])
+    
     def bbox2result_pcdet(self,
                           net_outputs,
                           class_names,
@@ -460,6 +471,7 @@ class PlusKittiDataset(KittiDataset):
 
         det_annos = []
         print('\nConverting prediction to pcdet format')
+        dts_dict = {}
         for idx, pred_dicts in enumerate(
                 mmcv.track_iter_progress(net_outputs)):
             annos = []
@@ -493,6 +505,7 @@ class PlusKittiDataset(KittiDataset):
                     'idx': 0
                 }
                 annos.append(anno)
+            self.save_dts_to_dict(idx, anno, dts_dict)
 
             det_annos += annos
 
@@ -502,7 +515,7 @@ class PlusKittiDataset(KittiDataset):
             mmcv.dump(det_annos, out)
             print(f'Result is saved to {out}.')
 
-        return det_annos
+        return det_annos, dts_dict
 
     def evaluate(self,
                  results,
