@@ -297,10 +297,11 @@ class DefaultFormatBundleMultiCam3D(object):
     - gt_labels: (1)to tensor, (2)to DataContainer
     """
 
-    def __init__(self, class_names, with_gt=True, with_label=True):
+    def __init__(self, class_names, with_gt=True, with_label=True, stack_image_feature=True):
         self.class_names = class_names
         self.with_gt = with_gt
         self.with_label = with_label
+        self.stack_image_feature = stack_image_feature
 
     def _format_multi_cam_imgs(self, results):
         img_list = []
@@ -319,9 +320,10 @@ class DefaultFormatBundleMultiCam3D(object):
             feature_list = []
             for idx, feat in enumerate(results['img_feature']):
                 feature_list.append(feat)
-            
-            feats = np.ascontiguousarray(np.stack(feature_list, axis=0))
-            results['img_feature'] = DC(to_tensor(feats), stack=True)
+            if self.stack_image_feature:
+                feats = np.ascontiguousarray(np.stack(feature_list, axis=0))
+                results['img_feature'] = DC(to_tensor(feats), stack=True)
+
         
         for key in [
             'proposals', 'gt_bboxes', 'gt_bboxes_ignore', 'gt_labels',

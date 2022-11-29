@@ -1,4 +1,5 @@
 import copy
+import json
 from json import detect_encoding
 import os
 import tempfile
@@ -92,7 +93,7 @@ class PlusKittiDataset(KittiDataset):
         if hasattr(self, 'flag'):
             self.flag = self.flag[::load_interval]
 
-        self.camera_names = ['front_left_camera', 'front_right_camera',
+        self.camera_names = ['front_left_camera', 
                              'side_left_camera', 'side_right_camera',
                              'rear_left_camera', 'rear_right_camera']
         self.camera_names =self.camera_names[:used_cameras]
@@ -462,6 +463,16 @@ class PlusKittiDataset(KittiDataset):
         
         return cam_anno
     
+    def save_dts_to_dict(self, index, dts, dts_dict):
+        info = self.data_infos[index]
+        sample_idx = info['point_cloud']['lidar_idx']
+        t_int = int(sample_idx.split('.')[1])
+        t_float = int(sample_idx.split('.')[2])*1e-6
+        time_stamp = t_int + t_float
+        dts_dict[time_stamp] = dict(dt_boxes=dts['dt_boxes'],
+                                    name=dts['name'],
+                                    score=dts['scores'])
+    
     def bbox2result_pcdet(self,
                           net_outputs,
                           class_names,
@@ -474,6 +485,7 @@ class PlusKittiDataset(KittiDataset):
 
         det_annos = []
         print('\nConverting prediction to pcdet format')
+        dts_dict = {}
         for idx, pred_dicts in enumerate(
                 mmcv.track_iter_progress(net_outputs)):
             annos = []
@@ -505,6 +517,7 @@ class PlusKittiDataset(KittiDataset):
                     'scores': np.array([]),
                 }
                 annos.append(anno)
+            self.save_dts_to_dict(idx, anno, dts_dict)
 
             det_annos += annos
 
@@ -514,7 +527,7 @@ class PlusKittiDataset(KittiDataset):
             mmcv.dump(det_annos, out)
             print(f'Result is saved to {out}.')
 
-        return det_annos
+        return det_annos, dts_dict
 
     def evaluate(self,
                  results,
@@ -556,7 +569,7 @@ class PlusKittiDataset(KittiDataset):
         result_dict = None
         from mmdet3d.core.evaluation import get_formatted_results
         
-        dets_pcdet = self.bbox2result_pcdet(results, self.CLASSES, pklfile_prefix)
+        dets_pcdet, dts_dict = self.bbox2result_pcdet(results, self.CLASSES, pklfile_prefix)
         
         # test bag 
         if bag_test_flag:
@@ -584,6 +597,12 @@ class PlusKittiDataset(KittiDataset):
         print_log('\n' + '****************pcdet eval done.*****************', logger=logger)
 
         eval_file_name = f'human_readable_results_{eval_cnt}.txt'
+        json_file_name = f'dt_results_{eval_cnt}.json'
+        
+        # save dt_results to json file for plus_benchmark
+        json_str = json.dumps(dts_dict, indent=4)
+        with open(os.path.join(eval_result_dir, json_file_name), 'w') as json_file:
+            json_file.write(json_str)
         
         if eval_result_dir is not None:
             with open(os.path.join(eval_result_dir, eval_file_name), 'w') as f:

@@ -7,7 +7,7 @@ import random
 
 from mmdet3d.core.points import LiDARPoints
 
-camera_names = ['front_left_camera', 'front_right_camera',
+camera_names = ['front_left_camera', 
                 'side_left_camera', 'side_right_camera',
                 'rear_left_camera', 'rear_right_camera']
 

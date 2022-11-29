@@ -1,91 +1,118 @@
 _base_ = [
     '../../_base_/schedules/cyclic_40e.py', '../../_base_/default_runtime.py'
 ]
-use_sync_bn=True
-using_tele=False
+using_tele=True
 # model settings
 voxel_size = [0.32, 0.32, 8]
 point_cloud_range = [-50, -51.2, -2, 154.8, 51.2, 6]
+use_sync_bn=True
 model = dict(
-    type='CenterPoint',
-    pts_voxel_layer=dict(
+    type='VoxelNet',
+    voxel_layer=dict(
         max_num_points=48,  # max_points_per_voxel
         point_cloud_range=point_cloud_range,
         voxel_size=voxel_size,
         max_voxels=(32000, 32000)  # (training, testing) max_voxels
     ),
-    pts_voxel_encoder=dict(
+    voxel_encoder=dict(
         type='PillarFeatureNet',
         in_channels=4,
         feat_channels=[64],
         with_distance=False,
         voxel_size=voxel_size,
         use_pcdet=True,
-        point_cloud_range=point_cloud_range,
-        legacy=False),
-    pts_middle_encoder=dict(
+        legacy=False,
+        with_camera_feature=False,
+        point_cloud_range=point_cloud_range),
+    middle_encoder=dict(
         type='PointPillarsScatter', in_channels=64, output_shape=[320, 640]),
-    pts_backbone=dict(
+    backbone=dict(
         type='PcdetBackbone',
         in_channels=64,
         layer_nums=[3, 5, 5],
         layer_strides=[2, 2, 2],
         num_filters=[64, 128, 256],
-        upsample_strides=[0.5, 1, 2],
+        upsample_strides=[1, 2, 4],
         num_upsample_filters=[128, 128, 128],
     ),
-    pts_bbox_head=dict(
-        type='CenterHead',
-        in_channels=sum([128, 128, 128]),
-        tasks=[
-            dict(num_class=1, class_names=['Pedestrian']),
-            dict(num_class=1, class_names=['Cyclist']),
-            dict(num_class=1, class_names=['Car']),
-            dict(num_class=1, class_names=['Truck']),
-        ],
-        common_heads=dict(
-            reg=(2, 2), height=(1, 2), dim=(3, 2), rot=(2, 2)),
-        share_conv_channel=64,
-        bbox_coder=dict(
-            type='CenterPointBBoxCoder',
-            post_center_range=point_cloud_range,
-            max_num=500,
-            score_threshold=0.1,
-            out_size_factor=4,
-            voxel_size=voxel_size[:2],
-            code_size=7,
-            pc_range=point_cloud_range[:2],),
-        separate_head=dict(
-            type='SeparateHead', init_bias=-2.19, final_kernel=3),
-        loss_cls=dict(type='GaussianFocalLoss', reduction='mean'),
-        loss_bbox=dict(type='L1Loss', reduction='mean', loss_weight=0.25),
-        norm_bbox=True),
+    bbox_head=dict(
+        type='Anchor3DHead',
+        num_classes=4,
+        in_channels=384,
+        feat_channels=384,
+        use_direction_classifier=True,
+        assign_per_class=True,
+        anchor_generator=dict(
+            type='AlignedAnchor3DRangeGenerator',
+            ranges=[
+                [-50, -51.2, -0.4, 154.8, 51.2, -0.4],
+                [-50, -51.2, -0.6, 154.8, 51.2, -0.6],
+                [-50, -51.2, -0.4, 154.8, 51.2, -0.4],
+                [-50, -51.2, -0.4, 154.8, 51.2, -0.4],
+            ],
+            sizes=[
+                   [4.63, 1.97, 1.74], # car
+                   [12.5, 2.94, 3.47],  # truck
+                   [0.8, 0.6, 1.73], # ped
+                   [1.76, 0.6, 1.73], # cyclist
+                   ],
+            rotations=[0, 1.57],
+            reshape_out=False),
+        diff_rad_by_sin=True,
+        bbox_coder=dict(type='DeltaXYZWLHRBBoxCoder'),
+        loss_cls=dict(
+            type='FocalLoss',
+            use_sigmoid=True,
+            gamma=2.0,
+            alpha=0.25,
+            loss_weight=1.0),
+        loss_bbox=dict(type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=2.0),
+        loss_dir=dict(
+            type='CrossEntropyLoss', use_sigmoid=False, loss_weight=0.2)),
     # model training and testing settings
     train_cfg=dict(
-        pts=dict(
-            grid_size=[640, 320, 1],
-            point_cloud_range=point_cloud_range,
-            voxel_size=voxel_size,
-            out_size_factor=4,
-            dense_reg=1,
-            gaussian_overlap=0.1,
-            max_objs=500,
-            min_radius=2,
-            code_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])),
+        assigner=[
+            dict(  # for Car
+                type='MaxIoUAssigner',
+                iou_calculator=dict(type='BboxOverlapsNearest3D'),
+                pos_iou_thr=0.6,
+                neg_iou_thr=0.45,
+                min_pos_iou=0.2,
+                ignore_iof_thr=-1),
+            dict(  # for Truck
+                type='MaxIoUAssigner',
+                iou_calculator=dict(type='BboxOverlapsNearest3D'),
+                pos_iou_thr=0.55,
+                neg_iou_thr=0.4,
+                min_pos_iou=0.2,
+                ignore_iof_thr=-1),
+            dict(  # for Pedestrian
+                type='MaxIoUAssigner',
+                iou_calculator=dict(type='BboxOverlapsNearest3D'),
+                pos_iou_thr=0.5,
+                neg_iou_thr=0.35,
+                min_pos_iou=0.2,
+                ignore_iof_thr=-1),
+            dict(  # for Cyclist
+                type='MaxIoUAssigner',
+                iou_calculator=dict(type='BboxOverlapsNearest3D'),
+                pos_iou_thr=0.5,
+                neg_iou_thr=0.35,
+                min_pos_iou=0.2,
+                ignore_iof_thr=-1),
+        ],
+        allowed_border=0,
+        pos_weight=-1,
+        debug=False),
     test_cfg=dict(
-        pts=dict(
-            post_center_limit_range=point_cloud_range,
-            max_per_img=500,
-            max_pool_nms=False,
-            min_radius=[0.175, 0.85, 4, 12],
-            score_threshold=0.1,
-            pc_range=point_cloud_range[:2],
-            out_size_factor=4,
-            voxel_size=voxel_size[:2],
-            nms_type='rotate',
-            pre_max_size=1000,
-            post_max_size=83,
-            nms_thr=0.2)))
+        use_rotate_nms=True,
+        nms_across_levels=False,
+        nms_thr=0.01,
+        score_thr=0.1,
+        min_bbox_size=0,
+        nms_pre=4096,
+        max_num=500))
+
 # dataset settings
 dataset_type = 'PlusKittiDataset'
 data_root = '/mnt/intel/jupyterhub/swc/datasets/L4_extracted_data/CN_L4_origin_data/'
@@ -95,7 +122,7 @@ under_tree_data = '/mnt/intel/jupyterhub/swc/datasets/L4_extracted_data/under_tr
 
 benchmark_root = '/mnt/intel/jupyterhub/swc/datasets/L4_extracted_data/CN_L4_origin_benchmark/'
 
-class_names = ['Pedestrian', 'Cyclist', 'Car', 'Truck']
+class_names = ['Car', 'Truck', 'Pedestrian', 'Cyclist']
 input_modality = dict(use_lidar=True, use_camera=False)
 
 file_client_args = dict(backend='disk')
@@ -257,8 +284,8 @@ concat_train_data = dict(
 )
 
 data = dict(
-    samples_per_gpu=8,
-    workers_per_gpu=8,
+    samples_per_gpu=4,
+    workers_per_gpu=4,
     train=dict(
         type='RepeatDataset',
         times=2,
@@ -299,10 +326,10 @@ optimizer = dict(lr=lr)
 # development of the codebase thus we keep the setting. But we does not
 # specifically tune this parameter.
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
-runner = dict(max_epochs=40)
+runner = dict(max_epochs=80)
 
 # Use evaluation interval=2 reduce the number of evaluation timese
-evaluation = dict(interval=5, pipeline=eval_pipeline)
+evaluation = dict(interval=10, pipeline=eval_pipeline)
 checkpoint_config = dict(interval=2)
 workflow = [('train', 2), ('val', 1)]
 # resume_from = '/mnt/intel/jupyterhub/swc/train_log/mm3d/pointpillars_L4_all_class_160e_lr0_001_p32000_pt48_v_025/20220926-173323/epoch_10.pth'

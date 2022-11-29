@@ -69,11 +69,11 @@ def get_paddings_indicator(actual_num, max_num, axis=0):
 
 
 def point_augment(features, num_points, coors):
-    vx = 0.25
-    vy = 0.25
+    vx = 0.32
+    vy = 0.32
     vz = 8.0
-    x_offset = vx / 2 + 0
-    y_offset = vy / 2 -10
+    x_offset = vx / 2 -50,
+    y_offset = vy / 2 -51.2
     z_offset = vz / 2 -2
     features_ls = [features]
     # Find distance of x, y, and z from cluster center
@@ -219,8 +219,8 @@ def onnx_inference(cfg, data_loader):
     print(f"====================== {onnx_rpn_output_name}")
     
     voxel_layer = Voxelization(**cfg.model.voxel_layer)
-    middle_layer = PointPillarsScatter(in_channels=64, output_shape=[80, 400])
-    head = Anchor3DHead(num_classes=2,
+    middle_layer = PointPillarsScatter(in_channels=64, output_shape=[320, 640])
+    head = Anchor3DHead(num_classes=4,
                         in_channels=384,
                         train_cfg=cfg.model.train_cfg,
                         test_cfg=cfg.model.test_cfg,
@@ -432,7 +432,7 @@ def main():
             base_dir = os.path.split(args.checkpoint)[0]
             save_path = os.path.join(base_dir, 'single_eval', ckpt_name)
             os.makedirs(save_path, exist_ok=True)
-            plot_save_dir = os.path.join(save_path, 'plot_results')
+            plot_save_dir = os.path.join(save_path, 'prefusion_onnx_plot_results')
             os.makedirs(plot_save_dir, exist_ok=True)
             eval_kwargs.update(dict(eval_file_tail=eval_file_tail,
                                     eval_result_dir=save_path,

@@ -279,7 +279,7 @@ def main():
                                     out_dir=plot_save_dir,
                                     plot_dt_result=args.plot_result,
                                     pklfile_prefix=pklfile_name,
-                                    bag_test_flag=False
+                                    bag_test_flag=args.test_flag
                                     ))
             print(dataset.evaluate(outputs, **eval_kwargs))
 
