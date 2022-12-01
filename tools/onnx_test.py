@@ -112,6 +112,7 @@ def parse_args():
     parser.add_argument('config', help='test config file path')
     parser.add_argument('checkpoint', help='checkpoint file')
     parser.add_argument('--out', help='output result file in pickle format')
+    parser.add_argument('--using_cpp', action='store_true')
     parser.add_argument(
         '--fuse-conv-bn',
         action='store_true',
@@ -408,7 +409,7 @@ def main():
         #                          args.gpu_collect)
     # print(outputs[0])
     print(f"show: {args.show}")
-    onnx_outputs = onnx_inference(cfg, data_loader, using_cpp=False)
+    onnx_outputs = onnx_inference(cfg, data_loader, using_cpp=args.using_cpp)
     # print(len(onnx_outputs))
     rank, _ = get_dist_info()
     if rank == 0:
@@ -441,7 +442,7 @@ def main():
             base_dir = os.path.split(args.checkpoint)[0]
             save_path = os.path.join(base_dir, 'single_eval', ckpt_name)
             os.makedirs(save_path, exist_ok=True)
-            plot_save_dir = os.path.join(save_path, 'prefusion_onnx_plot_results')
+            plot_save_dir = os.path.join(save_path, 'prefusion_w_painted_point_onnx_results')
             os.makedirs(plot_save_dir, exist_ok=True)
             eval_kwargs.update(dict(eval_file_tail=eval_file_tail,
                                     eval_result_dir=save_path,
