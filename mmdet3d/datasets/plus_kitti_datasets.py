@@ -1,5 +1,5 @@
 import copy
-import json
+import pickle
 from json import detect_encoding
 import os
 import tempfile
@@ -597,12 +597,11 @@ class PlusKittiDataset(KittiDataset):
         print_log('\n' + '****************pcdet eval done.*****************', logger=logger)
 
         eval_file_name = f'human_readable_results_{eval_cnt}.txt'
-        json_file_name = f'dt_results_{eval_cnt}.json'
+        pkl_file_name = f'dt_results_{eval_cnt}.pkl'
         
-        # save dt_results to json file for plus_benchmark
-        json_str = json.dumps(dts_dict, indent=4)
-        with open(os.path.join(eval_result_dir, json_file_name), 'w') as json_file:
-            json_file.write(json_str)
+        # save dt_results to pkl file for plus_benchmark        
+        with open(os.path.join(eval_result_dir, pkl_file_name), 'wb') as f:
+            pickle.dump(dts_dict, f)
         
         if eval_result_dir is not None:
             with open(os.path.join(eval_result_dir, eval_file_name), 'w') as f:

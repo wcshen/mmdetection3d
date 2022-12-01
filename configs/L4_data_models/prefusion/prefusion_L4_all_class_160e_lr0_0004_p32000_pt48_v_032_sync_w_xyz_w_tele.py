@@ -1,7 +1,7 @@
 _base_ = [
     '../../_base_/schedules/cyclic_40e.py', '../../_base_/default_runtime.py'
 ]
-using_tele=True
+using_tele=False
 # model settings
 voxel_size = [0.32, 0.32, 8]
 point_cloud_range = [-50, -51.2, -2, 154.8, 51.2, 6]
@@ -115,12 +115,12 @@ model = dict(
 
 # dataset settings
 dataset_type = 'PlusKittiDataset'
-data_root = '/home/wancheng.shen/datasets/L4_extracted_data/CN_L4_origin_data/'
-hard_case_data = '/home/wancheng.shen/datasets/L4_extracted_data/hard_case_origin_data/'
-side_vehicle_data = '/home/wancheng.shen/datasets/L4_extracted_data/side_vehicle_origin_data/'
-under_tree_data = '/home/wancheng.shen/datasets/L4_extracted_data/under_tree_origin_data/'
+data_root = '/mnt/intel/jupyterhub/swc/datasets/L4_extracted_data/CN_L4_origin_data/'
+hard_case_data = '/mnt/intel/jupyterhub/swc/datasets/L4_extracted_data/hard_case_origin_data/'
+side_vehicle_data = '/mnt/intel/jupyterhub/swc/datasets/L4_extracted_data/side_vehicle_origin_data/'
+under_tree_data = '/mnt/intel/jupyterhub/swc/datasets/L4_extracted_data/under_tree_origin_data/'
 
-benchmark_root = '/home/wancheng.shen/datasets/L4_extracted_data/CN_L4_origin_benchmark/'
+benchmark_root = '/mnt/intel/jupyterhub/swc/datasets/L4_extracted_data/CN_L4_origin_benchmark/'
 
 class_names = ['Car', 'Truck', 'Pedestrian', 'Cyclist']
 input_modality = dict(use_lidar=True, use_camera=False)
@@ -171,7 +171,7 @@ train_pipeline = [
     dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='PointShuffle'),
-    dict(type='DefaultFormatBundleMultiCam3D', class_names=class_names),
+    dict(type='DefaultFormatBundleMultiCam3D', class_names=class_names, stack_image_feature=False),
     dict(type='Collect3D', keys=['points', 'gt_bboxes_3d', 'gt_labels_3d'])
 ]
 
@@ -203,7 +203,8 @@ test_pipeline = [
             dict(
                 type='DefaultFormatBundleMultiCam3D',
                 class_names=class_names,
-                with_label=False),
+                with_label=False,
+                stack_image_feature=False),
             dict(type='Collect3D', keys=['points'])
         ])
 ]
@@ -223,7 +224,8 @@ eval_pipeline = [
     dict(
         type='DefaultFormatBundleMultiCam3D',
         class_names=class_names,
-        with_label=False),
+        with_label=False,
+        stack_image_feature=False),
     dict(type='Collect3D', keys=['points'])
 ]
 
@@ -235,7 +237,7 @@ concat_train_data = dict(
             data_root=data_root,
             ann_file=data_root + 'Kitti_L4_data_mm3d_infos_train.pkl',
             split='training',
-            pts_prefix='pointcloud',
+            pts_prefix='filtered_unified_points',
             pipeline=train_pipeline,
             modality=input_modality,
             classes=class_names,
@@ -250,7 +252,7 @@ concat_train_data = dict(
             data_root=hard_case_data,
             ann_file=hard_case_data + 'Kitti_L4_data_mm3d_infos_train.pkl',
             split='training',
-            pts_prefix='pointcloud',
+            pts_prefix='filtered_unified_points',
             pipeline=train_pipeline,
             modality=input_modality,
             classes=class_names,
@@ -265,7 +267,7 @@ concat_train_data = dict(
             data_root=side_vehicle_data,
             ann_file=side_vehicle_data + 'Kitti_L4_data_mm3d_infos_train.pkl',
             split='training',
-            pts_prefix='pointcloud',
+            pts_prefix='filtered_unified_points',
             pipeline=train_pipeline,
             modality=input_modality,
             classes=class_names,
@@ -280,7 +282,7 @@ concat_train_data = dict(
             data_root=under_tree_data,
             ann_file=under_tree_data + 'Kitti_L4_data_mm3d_infos_train.pkl',
             split='training',
-            pts_prefix='pointcloud',
+            pts_prefix='filtered_unified_points',
             pipeline=train_pipeline,
             modality=input_modality,
             classes=class_names,
@@ -294,7 +296,7 @@ concat_train_data = dict(
 )
 
 data = dict(
-    samples_per_gpu=8,
+    samples_per_gpu=4,
     workers_per_gpu=8,
     train=dict(
         type='RepeatDataset',
@@ -305,7 +307,7 @@ data = dict(
         data_root=data_root,
         ann_file=data_root + 'Kitti_L4_data_mm3d_infos_val.pkl',
         split='training',
-        pts_prefix='pointcloud',
+        pts_prefix='filtered_unified_points',
         pipeline=test_pipeline,
         modality=input_modality,
         classes=class_names,
@@ -319,7 +321,7 @@ data = dict(
         data_root=benchmark_root,
         ann_file=benchmark_root + 'Kitti_L4_data_mm3d_infos_val.pkl',
         split='training',
-        pts_prefix='pointcloud',
+        pts_prefix='filtered_unified_points',
         samples_per_gpu=4,
         used_cameras=3,
         pipeline=test_pipeline,

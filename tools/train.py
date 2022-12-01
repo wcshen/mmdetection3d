@@ -133,7 +133,7 @@ def main():
 
     # work_dir is determined in this priority: CLI > segment in file > filename
 
-    current_time = "{0:%Y-%m-%dT%H-%M-%S/}".format(datetime.datetime.now(tz=pytz.timezone("Asia/Chongqing")))
+    current_time = "{0:%Y-%m-%dT%H-%M/}".format(datetime.datetime.now(tz=pytz.timezone("Asia/Chongqing")))
     # args.work_dir example: '/mnt/intel/jupyterhub/xxx/train_log/mm3d'
     if args.work_dir is not None:
         # update configs according to cfg_name
