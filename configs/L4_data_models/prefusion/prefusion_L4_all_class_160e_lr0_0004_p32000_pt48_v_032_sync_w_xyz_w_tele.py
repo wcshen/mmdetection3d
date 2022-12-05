@@ -1,7 +1,7 @@
 _base_ = [
     '../../_base_/schedules/cyclic_40e.py', '../../_base_/default_runtime.py'
 ]
-using_tele=False
+using_tele=True
 # model settings
 voxel_size = [0.32, 0.32, 8]
 point_cloud_range = [-50, -51.2, -2, 154.8, 51.2, 6]
@@ -22,7 +22,6 @@ model = dict(
         voxel_size=voxel_size,
         use_pcdet=True,
         legacy=False,
-        with_camera_feature=True,
         point_cloud_range=point_cloud_range),
     middle_encoder=dict(
         type='PointPillarsScatter', in_channels=64, output_shape=[320, 640]),

@@ -51,9 +51,7 @@ class PillarFeatureNet(nn.Module):
                  mode='max',
                  legacy=True,
                  use_pcdet=False,
-                 use_norm=True,
-                 with_r=False,
-                 with_camera_feature=False):
+                 use_norm=True):
         super(PillarFeatureNet, self).__init__()
         assert len(feat_channels) > 0
         self.legacy = legacy
@@ -63,16 +61,12 @@ class PillarFeatureNet(nn.Module):
             in_channels += 3
         if with_distance:
             in_channels += 1
-        if with_r:
-            in_channels -= 1
         self._with_distance = with_distance
         self._with_cluster_center = with_cluster_center
         self._with_voxel_center = with_voxel_center
         self.use_pcdet = use_pcdet
         self.use_norm = use_norm
-        self.with_r = with_r
         self.fp16_enabled = False
-        self.with_camera_feature = with_camera_feature
         # Create PillarFeatureNet layers
         self.in_channels = in_channels
         feat_channels = [in_channels] + list(feat_channels)
