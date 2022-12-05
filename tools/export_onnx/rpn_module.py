@@ -16,7 +16,8 @@ class Anchor3DHead(nn.Module):
         self.feat_channels = feat_channels
 
         self.use_direction_classifier = use_direction_classifier
-        self.num_anchors = 4
+
+        self.num_anchors = num_classes * 2
         self.box_code_size = 7
 
         self.cls_out_channels = self.num_anchors * self.num_classes

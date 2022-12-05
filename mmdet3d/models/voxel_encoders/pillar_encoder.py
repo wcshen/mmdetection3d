@@ -123,11 +123,12 @@ class PillarFeatureNet(nn.Module):
         Returns:
             torch.Tensor: Features of pillars.
         """
-        if self.with_camera_feature:
-            camera_feature = features[:, :, 4:]
-            lidar_feature = features[:, :, :4]
-            lidar_feature[:, 3] = 0
-        features_ls = [features]
+
+        raw_points = features[:,:,:4]
+        raw_points[:,:,3] = 0
+        cam_features = features[:,:,4:]
+        
+        features_ls = [raw_points]
         # Find distance of x, y, and z from cluster center
         if self._with_cluster_center:
             points_mean = features[:, :, :3].sum(
@@ -166,15 +167,8 @@ class PillarFeatureNet(nn.Module):
         if self._with_distance:
             points_dist = torch.norm(features[:, :, :3], 2, 2, keepdim=True)
             features_ls.append(points_dist)
-            
-        if self.with_r:
-            features_r = torch.linalg.norm(features[:, :, :2], 2, 2, keepdim=True)
-            features_zi = features[:, :, 2:]
-            features_r_zi = torch.cat([features_r, features_zi], dim=-1)
-            features_ls[0] = features_r_zi
-            
-        if self.with_camera_feature:
-            features_ls = [lidar_feature, f_cluster, f_center, camera_feature]
+
+        features_ls.append(cam_features)
         # Combine together feature decorations
         features = torch.cat(features_ls, dim=-1)
         # The feature decorations were calculated without regard to whether
