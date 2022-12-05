@@ -555,7 +555,7 @@ class PlusKittiDataset(KittiDataset):
         """
         result_dict = None
         from mmdet3d.core.evaluation import get_formatted_results
-        det_pcdet = self.bbox2result_pcdet(results, self.CLASSES, pklfile_prefix)
+        det_pcdet,_ = self.bbox2result_pcdet(results, self.CLASSES, pklfile_prefix)
         if(not test_flag):
             # to pcdet format
             self.eval_cnt+=10

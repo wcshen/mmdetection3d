@@ -476,6 +476,6 @@ if __name__ == '__main__':
     painted_point_paths.sort()
     painted_point_paths = painted_point_paths[1:]
     
-    pfe_model_file = './tools/export_onnx/mm3d_all_classes_3cam_prefusion_p32000_pt48_v_032_pfe.onnx'
-    rpn_model_file = './tools/export_onnx/mm3d_all_classes_3cam_prefusion_p32000_pt48_v_032_rpn.onnx'
+    pfe_model_file = '/mnt/intel/jupyterhub/swc/train_log/mm3d/L4_data_models/prefusion/prefusion_w_xyz_w_tele_3c_last/prefusion_L4_all_class_160e_lr0_0004_p32000_pt48_v_032_sync_w_xyz_w_tele/2022-12-01T10-41/onnxs/mm3d_all_classes_3cam_prefusion_p32000_pt48_v_032_pfe_20221202.onnx'
+    rpn_model_file = '/mnt/intel/jupyterhub/swc/train_log/mm3d/L4_data_models/prefusion/prefusion_w_xyz_w_tele_3c_last/prefusion_L4_all_class_160e_lr0_0004_p32000_pt48_v_032_sync_w_xyz_w_tele/2022-12-01T10-41/onnxs/mm3d_all_classes_3cam_prefusion_p32000_pt48_v_032_rpn_20221202.onnx'
     main()
