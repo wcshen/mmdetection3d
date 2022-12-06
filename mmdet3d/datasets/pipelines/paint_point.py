@@ -47,6 +47,8 @@ class PaintPointsWithImageFeature:
             coor_x = lidar_pts[:, 0] / lidar_pts[:, 2]
             coor_y = lidar_pts[:, 1] / lidar_pts[:, 2]
             
+            invalid_mask = lidar_pts[:, 2] <= 0
+            
             image_shape = results['img_shape'][camera_idx]
             h, w = image_shape[0], image_shape[1]
             coor_y = coor_y / (h - 1) * 2 - 1
@@ -65,6 +67,7 @@ class PaintPointsWithImageFeature:
             padding_mode='zeros',
             align_corners=True)  # 1xCx1xN feats
             camera_features = camera_features.squeeze().t().numpy().astype(np.float64)  # (N, c)
+            camera_features[invalid_mask] = 0
             camera_features_list.append(camera_features)
             
         all_camera_features = np.stack(camera_features_list, axis=0)
