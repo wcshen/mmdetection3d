@@ -260,7 +260,7 @@ def draw_boxes_on_canvas(canvas, boxes, bev_range, scores=None, label_strings=No
 
 
 det_colors_table = {
-    'Car': [0, 255, 0],
+    'Car': [255, 255, 255],
     'Truck': [255, 0, 0],
     'Pedestrian': [0, 0, 255],
     'Cyclist': [255, 255, 0]
@@ -324,8 +324,10 @@ def plot_gt_det_cmp(points, gt_boxes, det_boxes, bev_range, scores=None, path=No
     
     color_idx = 1
     for k,v in det_colors_table.items():
-        cv2.putText(canvas, k, (10, 40*color_idx), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=v, thickness=2)
+        cv2.putText(canvas, k, (10, 50*color_idx), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=v, thickness=2)
         color_idx += 1
+    
+    cv2.putText(canvas, "GT", (10, 50*5), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=gt_color, thickness=2)
 
     if path is not None:
         cv2.imwrite(path, canvas)

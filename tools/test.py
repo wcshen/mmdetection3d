@@ -269,6 +269,7 @@ def main():
             ckpt_name = os.path.basename(args.checkpoint)
             eval_file_tail = int(ckpt_name.split('.')[0].split('_')[1])
             base_dir = os.path.split(args.checkpoint)[0]
+            # TODO(swc): set save path of bag test in the bag_path
             save_path = os.path.join(base_dir, 'single_eval', ckpt_name)
             os.makedirs(save_path, exist_ok=True)
             plot_save_dir = os.path.join(save_path, 'plot_results')

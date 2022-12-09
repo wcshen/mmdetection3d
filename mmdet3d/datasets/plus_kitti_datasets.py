@@ -607,7 +607,7 @@ class PlusKittiDataset(KittiDataset):
             with open(os.path.join(eval_result_dir, eval_file_name), 'w') as f:
                 f.write(result_str)
         if plot_dt_result:
-            self.save_eval_results(dets_pcdet, out_dir) # todo
+            self.save_eval_results(dets_pcdet, out_dir, gt_annos_pcdet) # todo
         return result_dict
     
     @staticmethod
@@ -624,10 +624,11 @@ class PlusKittiDataset(KittiDataset):
         all_image = np.hstack((org_image[:,:w0,:], trans_image[:,:w1,:]))
         return all_image
     
-    def save_eval_results(self, dets_pcdet, results_dir):
+    def save_eval_results(self, dets_pcdet, results_dir, gt_annos_pcdet=None):
         from .utils import plot_gt_det_cmp
-        
-        for i, result in enumerate(dets_pcdet):
+        loop_size = len(dets_pcdet)
+        for i in range(loop_size):
+            dt_result = dets_pcdet[i]
             data_info = self.data_infos[i]
             pts_path = data_info['point_cloud']['lidar_idx']
             file_name = f"{self.root_split}/{self.pts_prefix}/{pts_path}.bin"
@@ -637,11 +638,15 @@ class PlusKittiDataset(KittiDataset):
             detect_img = f"{self.root_split}/{img_path}"
             print(detect_img)
             detect_img = cv2.imread(detect_img)
-            pred_bboxes = result['dt_boxes']
-            scores = result['scores']
-            names = result['name']
+            pred_bboxes = dt_result['dt_boxes']
+            scores = dt_result['scores']
+            names = dt_result['name']
             path=results_dir + f"/{pts_path}.jpg"
-            bev_img = plot_gt_det_cmp(points, [], pred_bboxes, self.pcd_limit_range, path=None, scores=scores, names=names)
+            gt_bboxes = []
+            if gt_annos_pcdet:
+                gt_result = gt_annos_pcdet[i]
+                gt_bboxes = gt_result['gt_boxes']
+            bev_img = plot_gt_det_cmp(points, gt_bboxes, pred_bboxes, self.pcd_limit_range, path=None, scores=scores, names=names)
             all_image = self.concate_img(detect_img, bev_img)
             cv2.imwrite(path, all_image)
     
