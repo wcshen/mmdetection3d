@@ -1,0 +1,22 @@
+ALL_CLASS_NAMES: ['Car', 'Truck', 'Pedestrian', 'Cyclist']
+VEHICLE_CLASS_NAMES: ['Car', 'Truck']
+
+DATA_PATH: '/mnt/intel/jupyterhub/swc/datasets/L4_extracted_data/CN_L4_origin_benchmark'
+BAG_DATA_PATH: '/mnt/intel/jupyterhub/swc/plus/bags_extract/20221208T104246_pdb-l4e-b0002_23_17to22.db'
+
+POINT_CLOUD_RANGE: [-50, -50, -2, 200, 50, 6]
+
+DATA_SPLIT: {
+    'train': train,
+    'val': val,
+    'test': test,
+}
+
+CAMERA_NMAES: [
+            'front_left_camera',
+            'front_right_camera',
+            'side_left_camera',
+            'side_right_camera',
+            'rear_left_camera',
+            'rear_right_camera'
+        ]
