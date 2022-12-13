@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 export NCCL_P2P_DISABLE=1 
-
+# ps -ef | grep train.py | grep rongbo | grep -v grep | awk '{print "kill -9 "$2}' | sh
 
 # CUDA_VISIBLE_DEVICES="1,2,3,4,5,6" \
 # PORT=29509 \

@@ -36,7 +36,6 @@ class BaseTransform(nn.Module):
         super().__init__()
         self.in_channels = in_channels
         self.image_size = image_size
-        self.feature_size = feature_size
         self.xbound = xbound
         self.ybound = ybound
         self.zbound = zbound
@@ -49,14 +48,12 @@ class BaseTransform(nn.Module):
 
         self.C = out_channels
         
-        self.d = torch.arange(*self.dbound, dtype=torch.float)\
-            .view(-1, 1, 1).expand(-1, feature_size[0], feature_size[1])
-        self.D = self.d.shape[0]
+        self.D = torch.arange(*self.dbound, dtype=torch.float).shape[0] #深度范围，[0,100,1]的话是99
         self.fp16_enabled = False
 
     @force_fp32()
-    def create_frustum(self, img_size):
-        fH, fW = self.feature_size #32x88
+    def create_frustum(self, img_size, feature_size):
+        fH, fW = feature_size #32x88
         iH, iW = img_size[0:2]
         ds = (
             torch.arange(*self.dbound, dtype=torch.float) # 1 60 0.5
@@ -81,7 +78,7 @@ class BaseTransform(nn.Module):
 
     @force_fp32()
     def get_geometry(
-        self, rots, trans, cam2imgs, post_rots, post_trans, img_metas, **kwargs):
+        self, rots, trans, cam2imgs, post_rots, post_trans, img_metas, start=0, end=-1, **kwargs):
         B, N, _ = trans.shape
 
         # post-transformation
@@ -91,8 +88,8 @@ class BaseTransform(nn.Module):
         frustums = []
         for i in range(B):
             single_frustums=[]
-            for img_shape in img_metas[i]['img_shape']: # 多个camera
-                single_frustum = self.create_frustum(img_shape[0:2])
+            for img_shape, img_feature_shape in zip(img_metas[i]['img_shape'][start:end],  img_metas[i]['img_feature_shape'][start:end]): # 多个camera
+                single_frustum = self.create_frustum(img_shape[0:2], img_feature_shape[-2:])
                 single_frustums.append(single_frustum)
             frustums.append(torch.stack(single_frustums))
 
@@ -179,12 +176,28 @@ class BaseTransform(nn.Module):
         rots = camera2lidar[..., :3, :3]
         trans = camera2lidar[..., :3, 3]
         intrins = camera_intrinsics[..., :3, :3]
+        
+        if not isinstance(img_feats, list): # 从头开始训练
+            geom = self.get_geometry(rots, trans, intrins, None, None, img_metas, **kwargs)
+            x = self.get_cam_feats(img_feats)
+            x = self.bev_pool(geom, x)
+            return x
+        else: # 加载离线feature,front和side的feature大小不一致
+            start, end = 0, 2
+            front_geom = self.get_geometry(rots[:, start:end, :, :], trans[:, start:end, :], intrins[:, start:end, :, :], None, None, img_metas, start, end, **kwargs)
+            start, end = 2, 4        
+            side_geom = self.get_geometry(rots[:, start:end, :, :], trans[:, start:end, :], intrins[:, start:end, :, :], None, None, img_metas, start, end, **kwargs)
+            geoms =[front_geom, side_geom]
+            
+            bev_feats = []
+            for img_feat, geom in zip(img_feats, geoms):
+                x = self.get_cam_feats(img_feat)
+                x = self.bev_pool(geom, x)
+                bev_feats.append(x)
+            
+            result = torch.max(bev_feats[0], bev_feats[1])
+            return result
 
-        geom = self.get_geometry(rots, trans, intrins, None, None, img_metas, **kwargs)
-
-        x = self.get_cam_feats(img_feats)
-        x = self.bev_pool(geom, x)
-        return x
 
 
 class BaseDepthTransform(BaseTransform):
