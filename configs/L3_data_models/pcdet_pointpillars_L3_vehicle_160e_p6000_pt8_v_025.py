@@ -21,6 +21,7 @@ model = dict(
         with_distance=False,
         voxel_size=voxel_size,
         use_pcdet=True,
+        legacy=False,
         point_cloud_range=point_cloud_range),
     middle_encoder=dict(
         type='PointPillarsScatter', in_channels=64, output_shape=[80, 400]),

@@ -21,6 +21,7 @@ model = dict(
         with_distance=False,
         voxel_size=voxel_size,
         use_pcdet=True,
+        legacy=False,
         point_cloud_range=point_cloud_range),
     middle_encoder=dict(
         type='PointPillarsScatter', in_channels=64, output_shape=[80, 400]),
@@ -138,7 +139,7 @@ train_pipeline = [
         file_client_args=file_client_args),
     # dict(type='ObjectSample', db_sampler=db_sampler, use_ground_plane=True),
     dict(type='LoadMultiCamImagesFromFile'),
-    dict(type='PaintPointsWithImageFeature', used_cameras=1),
+    dict(type='PaintPointsWithImageFeature', used_cameras=1, drop_camera_prob=0),
     dict(type='RandomFlipLidarOnly', flip_ratio_bev_horizontal=0.5),
     dict(
         type='GlobalRotScaleTrans',
@@ -160,7 +161,7 @@ test_pipeline = [
         file_client_args=file_client_args,
         point_type='float64'),
     dict(type='LoadMultiCamImagesFromFile'),
-    dict(type='PaintPointsWithImageFeature', used_cameras=1),
+    dict(type='PaintPointsWithImageFeature', used_cameras=1, drop_camera_prob=0),
     
     dict(
         type='MultiScaleFlipAug3D',
@@ -233,6 +234,7 @@ data = dict(
         classes=class_names,
         test_mode=True,
         pcd_limit_range=point_cloud_range,
+        used_cameras=1,
         box_type_3d='LiDAR',
         file_client_args=file_client_args),
     test=dict(
@@ -247,6 +249,7 @@ data = dict(
         classes=class_names,
         pcd_limit_range=point_cloud_range,
         test_mode=True,
+        used_cameras=1,
         box_type_3d='LiDAR',
         file_client_args=file_client_args))
 # In practice PointPillars also uses a different schedule
